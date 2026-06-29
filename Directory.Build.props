@@ -9,6 +9,7 @@
 
   <PropertyGroup>
     <PackageProjectUrl>https://github.com/Spindle-Net/Spindle</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/Spindle-Net/Spindle</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -20,4 +21,8 @@
     <Description>C# Code First Workflow Framework</Description>
     <Copyright>Copyright (c) $([System.DateTime]::Now.ToString('yyyy')) Spindle.Net</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)assets/icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
