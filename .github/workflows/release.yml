@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  release:
+    name: Build, test, pack, and deploy
+    runs-on: ubuntu-latest
+    environment: release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '$GITHUB_REF_NAME' must look like v1.2.3 or v1.2.3-preview.1." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore Spindle.Net.slnx
+
+      - name: Build
+        run: dotnet build Spindle.Net.slnx --configuration Release --no-restore /p:Version="${{ steps.version.outputs.version }}" /p:PackageVersion="${{ steps.version.outputs.version }}" /p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        run: dotnet test Spindle.Net.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Pack
+        shell: bash
+        run: |
+          mkdir -p artifacts
+
+          while IFS= read -r -d '' project; do
+            dotnet pack "$project" \
+              --configuration Release \
+              --no-build \
+              --output artifacts \
+              /p:Version="${{ steps.version.outputs.version }}" \
+              /p:PackageVersion="${{ steps.version.outputs.version }}" \
+              /p:ContinuousIntegrationBuild=true
+          done < <(find src -name '*.csproj' -print0 | sort -z)
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ github.ref_name }}
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg --verify-tag --generate-notes
+          fi
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish packages to NuGet
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          shopt -s nullglob
+
+          for package in artifacts/*.nupkg artifacts/*.snupkg; do
+            dotnet nuget push "$package" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
