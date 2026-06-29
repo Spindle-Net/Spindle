@@ -1,15 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <Description>Core workflow abstractions for Spindle.Net.</Description>
     </PropertyGroup>
 
     <ItemGroup>
-      <Reference Include="Microsoft.Extensions.Logging.Abstractions">
-        <HintPath>..\..\..\..\.nuget\packages\microsoft.extensions.logging.abstractions\10.0.8\lib\net10.0\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
-      </Reference>
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
     </ItemGroup>
 
 </Project>

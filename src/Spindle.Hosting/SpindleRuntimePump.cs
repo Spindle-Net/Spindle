@@ -10,7 +10,7 @@ public sealed class SpindleRuntimePump(
     IOptions<SpindleHostOptions> options)
     : ISpindleRuntimePump
 {
-    private readonly Lock _gate = new();
+    private readonly object _gate = new();
     private readonly Dictionary<FlowInstanceId, Task<RuntimeInstanceAdvanceResult>> _inFlight = [];
     private readonly HashSet<FlowInstanceId> _quiescent = [];
     private readonly SemaphoreSlim _wakeups = new(0);
