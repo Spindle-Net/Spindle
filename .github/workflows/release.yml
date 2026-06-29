@@ -76,17 +76,6 @@ jobs:
             artifacts/*.snupkg
           if-no-files-found: error
 
-      - name: Create GitHub release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg --verify-tag --generate-notes
-          fi
-
       - name: NuGet login
         uses: NuGet/login@v1
         id: nuget-login
@@ -106,3 +95,9 @@ jobs:
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate
           done
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg --verify-tag --generate-notes
