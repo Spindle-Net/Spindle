@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Spindle.Abstractions\Spindle.Abstractions.csproj" />
+      <ProjectReference Include="..\Spindle.Persistence.Abstractions\Spindle.Persistence.Abstractions.csproj" />
+      <ProjectReference Include="..\Spindle.Transport.Abstractions\Spindle.Transport.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Microsoft.Extensions.Logging.Abstractions">
+        <HintPath>..\..\..\..\.nuget\packages\microsoft.extensions.logging.abstractions\10.0.8\lib\net10.0\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

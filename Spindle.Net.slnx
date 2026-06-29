@@ -1,0 +1,28 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="src/Spindle.Abstractions/Spindle.Abstractions.csproj" />
+    <Project Path="src/Spindle.Hosting/Spindle.Hosting.csproj" />
+    <Project Path="src/Spindle.Runtime/Spindle.Runtime.csproj" />
+    <Project Path="src/Spindle/Spindle.csproj" />
+    <Project Path="src/Spindle.Testing/Spindle.Testing.csproj" />
+  </Folder>
+  <Folder Name="/Examples/">
+    <Project Path="examples/Spindle.Example.Hosting/Spindle.Example.Hosting.csproj" />
+    <Project Path="examples/Spindle.Example.LowLevel/Spindle.Example.LowLevel.csproj" />
+  </Folder>
+  <Folder Name="/Persistence/">
+    <Project Path="src/Spindle.Persistence.Abstractions/Spindle.Persistence.Abstractions.csproj" />
+    <Project Path="src/Spindle.Persistence.InMemory/Spindle.Persistence.InMemory.csproj" />
+  </Folder>
+  <Folder Name="/Transport/">
+    <Project Path="src/Spindle.Transport.Abstractions/Spindle.Transport.Abstractions.csproj" />
+    <Project Path="src/Spindle.Transport.InMemory/Spindle.Transport.InMemory.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Spindle.Persistence.Abstractions.Tests/Spindle.Persistence.Abstractions.Tests.csproj" />
+    <Project Path="tests/Spindle.Transport.Abstractions.Tests/Spindle.Transport.Abstractions.Tests.csproj" />
+    <Project Path="tests/Spindle.Testing.Tests/Spindle.Testing.Tests.csproj" />
+    <Project Path="tests/Spindle.Runtime.Tests/Spindle.Runtime.Tests.csproj" />
+    <Project Path="tests/Spindle.Hosting.Tests/Spindle.Hosting.Tests.csproj" />
+  </Folder>
+</Solution>
