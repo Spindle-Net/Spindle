@@ -13,6 +13,7 @@
   <Folder Name="/Persistence/">
     <Project Path="src/Spindle.Persistence.Abstractions/Spindle.Persistence.Abstractions.csproj" />
     <Project Path="src/Spindle.Persistence.InMemory/Spindle.Persistence.InMemory.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore/Spindle.Persistence.EFCore.csproj" />
   </Folder>
   <Folder Name="/Transport/">
     <Project Path="src/Spindle.Transport.Abstractions/Spindle.Transport.Abstractions.csproj" />
