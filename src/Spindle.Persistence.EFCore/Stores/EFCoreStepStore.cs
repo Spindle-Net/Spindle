@@ -38,7 +38,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         cancellationToken.ThrowIfCancellationRequested();
 
         var alreadyExists = await context.StepInstances.AnyAsync(x => x.FlowInstanceId == step.FlowInstanceId.Value &&
-                                                                      x.StepId == step.StepId.Value);
+                                                                      x.StepId == step.StepId.Value, cancellationToken);
         if (alreadyExists)
         {
             throw new InvalidOperationException(
@@ -292,7 +292,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         step.CompletedAt = completedAt;
         step.UpdatedAt = completedAt;
 
-        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Completed, completedAt, null);
+        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Completed, completedAt, null, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
     }
 
@@ -322,7 +322,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
                 .SetProperty(x => x.UpdatedAt, _ => failedAt)
             , cancellationToken);
 
-        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Failed, failedAt, error);
+        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Failed, failedAt, error, cancellationToken);
     }
 
     private async Task CompleteLatestAttempt(

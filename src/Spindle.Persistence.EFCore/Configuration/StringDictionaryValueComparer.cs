@@ -6,12 +6,15 @@ internal sealed class StringDictionaryValueComparer()
     : ValueComparer<IReadOnlyDictionary<string, string>>(
         (left, right) => ValuesEqual(left, right),
         values => GetValueHashCode(values),
-        values => new Dictionary<string, string>(values))
+        values => values == null 
+                ? new Dictionary<string, string>() 
+                : new Dictionary<string, string>(values))
 {
     private static bool ValuesEqual(
         IReadOnlyDictionary<string, string>? left,
         IReadOnlyDictionary<string, string>? right)
     {
+        if (left == null && right == null) return true;
         return left != null &&
             right != null &&
             left.Count == right.Count &&

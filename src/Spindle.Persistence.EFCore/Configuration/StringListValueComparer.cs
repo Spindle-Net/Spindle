@@ -12,6 +12,7 @@ internal sealed class StringListValueComparer()
         List<string>? left,
         List<string>? right)
     {
+        if (left == null && right == null) return true;
         return left != null && right != null && left.SequenceEqual(right);
     }
 
