@@ -37,6 +37,7 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
                 AcquiredAt = lease.AcquiredAt,
                 ExpiresAt = lease.ExpiresAt,
             }, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
             return true;
         }
 
@@ -44,6 +45,7 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
         existing.Owner = lease.Owner;
         existing.AcquiredAt = lease.AcquiredAt;
         existing.ExpiresAt = lease.ExpiresAt;
+        await context.SaveChangesAsync(cancellationToken);
         return true;
     }
 

@@ -38,15 +38,10 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
             existing.DefinitionHash = definition.DefinitionHash;
             existing.FlowTypeName = definition.FlowTypeName;
             existing.Definition = definition.Definition;
-            if (existing.UpdatedAt == definition.UpdatedAt)
-            {
-                existing.UpdatedAt = DateTimeOffset.Now;
-            }
-            else
-            {
-                existing.UpdatedAt = definition.UpdatedAt;    
-            }
+            existing.UpdatedAt = definition.UpdatedAt;
         }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask<FlowDefinitionRecord?> GetAsync(

@@ -9,8 +9,6 @@ internal class StepLeaseEntity
 
     public required string StepId { get; init; }
 
-    public StepInstanceEntity? Step { get; set; }
-
     public required string Owner { get; set; }
 
     public required DateTimeOffset AcquiredAt { get; set; }

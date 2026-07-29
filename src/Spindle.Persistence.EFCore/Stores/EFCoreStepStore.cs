@@ -3,7 +3,6 @@ using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.EFCore.Entities;
 using Spindle.Persistence.Steps;
-using System.Linq.Expressions;
 
 namespace Spindle.Persistence.EFCore.Stores;
 
@@ -26,6 +25,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         Error = step.Error,
         Attempt = step.Attempt,
         RetryAt = step.RetryAt,
+        StartedAt = step.StartedAt,
         CompletedAt = step.CompletedAt,
         CreatedAt = step.CreatedAt,
         UpdatedAt = step.UpdatedAt,
@@ -46,6 +46,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         }
 
         await context.StepInstances.AddAsync(RecordToEntity(step), cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask CreateManyAsync(
@@ -61,12 +62,13 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
             StepIds = x.Select(y => y.StepId.Value).ToList()
         });
 
-        var existingTasks = groupedSteps.Select(g => context.StepInstances
-                    .Where(x => x.FlowInstanceId == g.FlowInstanceId && g.StepIds.Contains(x.StepId))
-                    .Select(x => new { x.FlowInstanceId, x.StepId })
-                    .ToListAsync(cancellationToken));
-        var existingResults = await Task.WhenAll(existingTasks);
-        var existing = existingResults.SelectMany(x => x).ToList();
+        var existing = new List<StepInstanceEntity>();
+        foreach (var group in groupedSteps)
+        {
+            existing.AddRange(await context.StepInstances
+                .Where(x => x.FlowInstanceId == group.FlowInstanceId && group.StepIds.Contains(x.StepId))
+                .ToListAsync(cancellationToken));
+        }
 
         if (existing.Count > 0)
         {
@@ -88,9 +90,10 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
 
         await context.StepInstances.AddRangeAsync(steps.Select(RecordToEntity), cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static Expression<Func<StepInstanceEntity, StepInstanceRecord>> InstanceTranslation = x => new StepInstanceRecord
+    private static StepInstanceRecord EntityToRecord(StepInstanceEntity x) => new()
     {
         FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
         StepId = new StepId(x.StepId),
@@ -118,10 +121,12 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await context.StepInstances
+        var entity = await context.StepInstances
+            .AsNoTracking()
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
-            .Select(InstanceTranslation)
             .FirstOrDefaultAsync(cancellationToken);
+
+        return entity is null ? null : EntityToRecord(entity);
     }
 
     public async ValueTask<IReadOnlyList<StepInstanceRecord>> GetManyAsync(
@@ -134,10 +139,12 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
         var ids = stepIds.Select(x => x.Value).Distinct().ToList();
 
-        return await context.StepInstances
+        var entities = await context.StepInstances
+            .AsNoTracking()
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && ids.Contains(x.StepId))
-            .Select(InstanceTranslation)
             .ToListAsync(cancellationToken);
+
+        return entities.Select(EntityToRecord).ToArray();
     }
 
     public async ValueTask<IReadOnlyList<StepInstanceRecord>> GetByFlowInstanceAsync(
@@ -146,12 +153,14 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await context.StepInstances
+        var entities = await context.StepInstances
+            .AsNoTracking()
             .Where(x => x.FlowInstanceId == flowInstanceId.Value)
-            .Select(InstanceTranslation)
             .OrderBy(step => step.CreatedAt)
             .ThenBy(x => x.StepId)
             .ToListAsync(cancellationToken);
+
+        return entities.Select(EntityToRecord).ToArray();
     }
 
     public async ValueTask<IReadOnlyList<StepInstanceRecord>> GetReadyStepsAsync(
@@ -160,12 +169,15 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await context.StepInstances
+        var entities = await context.StepInstances
+            .AsNoTracking()
             .Where(x => x.Status == StepStatus.Ready)
-            .Select(InstanceTranslation)
             .OrderBy(step => step.CreatedAt)
             .ThenBy(x => x.StepId)
+            .Take(maxCount)
             .ToListAsync(cancellationToken);
+
+        return entities.Select(EntityToRecord).ToArray();
     }
 
     public async ValueTask MarkReadyAsync(
@@ -216,7 +228,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(x => x.Status, _ => StepStatus.Running)
-                .SetProperty(x => x.Attempt, _ => prevAttempt.Attempt + 1) // x => x.Attempt + 1 - This would cause the next entity to have a weird Attempt value
+                .SetProperty(x => x.Attempt, _ => prevAttempt.Attempt + 1)
                 .SetProperty(x => x.StartedAt, _ => startedAt)
                 .SetProperty(x => x.UpdatedAt, _ => startedAt)
             , cancellationToken);
@@ -226,11 +238,12 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
             FlowInstanceId = flowInstanceId.Value,
             StepId = stepId.Value,
             AttemptId = attemptId.Value,
-            Attempt = prevAttempt.Attempt,
+            Attempt = prevAttempt.Attempt + 1,
             WorkerId = workerId,
             Status = StepStatus.Running,
             StartedAt = startedAt,
         }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask MarkWaitingAsync(

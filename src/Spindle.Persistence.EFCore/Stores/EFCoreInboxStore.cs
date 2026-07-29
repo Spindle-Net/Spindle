@@ -29,6 +29,7 @@ internal sealed class EFCoreInboxStore(SpindleDbContext context) : IInboxStore
             ReceivedAt = message.ReceivedAt,
             ProcessedAt = message.ProcessedAt,
         }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
 
         return true;
     }

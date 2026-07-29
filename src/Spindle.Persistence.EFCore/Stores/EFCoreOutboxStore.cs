@@ -23,6 +23,7 @@ internal sealed class EFCoreOutboxStore(SpindleDbContext context) : IOutboxStore
             CreatedAt = message.CreatedAt,
             PublishedAt = message.PublishedAt,
         }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private readonly static Expression<Func<OutboxMessageEntity, OutboxMessageRecord>> Transformer = x => new OutboxMessageRecord
@@ -43,7 +44,7 @@ internal sealed class EFCoreOutboxStore(SpindleDbContext context) : IOutboxStore
 
         return await context.OutboxMessages
             .AsNoTracking()
-            .Where(message => message.PublishedAt != null)
+            .Where(message => message.PublishedAt == null)
             .OrderBy(message => message.CreatedAt)
             .Take(maxCount)
             .Select(Transformer)

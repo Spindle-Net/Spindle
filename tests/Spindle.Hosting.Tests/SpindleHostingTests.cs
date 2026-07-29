@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
@@ -7,6 +9,8 @@ using Spindle.Abstractions.Steps;
 using Spindle.Hosting;
 using Spindle.Persistence;
 using Spindle.Persistence.InMemory;
+using Spindle.Persistence.EFCore;
+using Spindle.Persistence.EFCore.Sqlite;
 using Spindle.Testing;
 using Xunit;
 
@@ -289,6 +293,54 @@ public sealed class SpindleHostingTests
             await hosted.StopAsync(CancellationToken.None);
         }
 
+        var instance = await store.FlowInstances.GetAsync(handle.InstanceId);
+        var serializer = provider.GetRequiredService<ISpindleSerializer>();
+
+        Assert.NotNull(instance?.Result);
+        Assert.Equal(new TestResult(42), serializer.Deserialize<TestResult>(instance.Result));
+    }
+
+    [Fact]
+    public async Task EntityFrameworkStore_PumpsRegisteredFlowsFromDependencyInjection()
+    {
+        var flowName = new FlowName("efcore-hosted-service-flow");
+        var connectionString = $"Data Source=SpindleTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        await using var databaseAnchor = new SqliteConnection(connectionString);
+        await databaseAnchor.OpenAsync();
+        var services = new ServiceCollection();
+
+        services.AddSpindleSqlite(connectionString);
+        services.AddSpindleFlow<HostedServiceFlow, TestRequest, TestResult>(flowName);
+        services.AddSpindleWorker(options =>
+        {
+            options.PollInterval = TimeSpan.FromMilliseconds(10);
+            options.MaxConcurrentFlowInstances = 2;
+            options.MaxStepsPerFlowPerTick = 1;
+            options.WorkerId = "efcore-hosted-test-worker";
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var database = provider.GetRequiredService<SpindleDbContext>();
+        await database.Database.MigrateAsync();
+
+        var runtime = provider.GetRequiredService<ISpindleRuntime>();
+        var hosted = provider.GetServices<IHostedService>().Single();
+        var handle = await runtime.StartAsync<TestRequest, TestResult>(
+            flowName,
+            new TestRequest(41));
+
+        await hosted.StartAsync(CancellationToken.None);
+
+        try
+        {
+            await WaitForCompletedAsync(runtime, handle.InstanceId);
+        }
+        finally
+        {
+            await hosted.StopAsync(CancellationToken.None);
+        }
+
+        var store = provider.GetRequiredService<ISpindleStore>();
         var instance = await store.FlowInstances.GetAsync(handle.InstanceId);
         var serializer = provider.GetRequiredService<ISpindleSerializer>();
 

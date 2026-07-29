@@ -9,8 +9,6 @@ internal class SignalWaitEntity
 
     public required string StepId { get; init; }
 
-    public StepInstanceEntity? Step { get; set; }
-
     public required string SignalName { get; init; }
 
     public string? CorrelationKey { get; init; }
@@ -19,5 +17,5 @@ internal class SignalWaitEntity
 
     public DateTimeOffset? ExpiresAt { get; init; }
 
-    public DateTimeOffset? CompletedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; set; }
 }

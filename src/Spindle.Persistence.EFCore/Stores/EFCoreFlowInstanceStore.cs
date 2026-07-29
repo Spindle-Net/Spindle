@@ -18,8 +18,8 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         var existing = await context.FlowInstances.FirstOrDefaultAsync(x =>
             (x.InstanceId == instance.InstanceId.Value) || // Either the instance itself exists already OR
             (instance.IdempotencyKey != null && x.FlowName == instance.FlowName.Value &&
-                string.Equals(x.IdempotencyKey, instance.IdempotencyKey, StringComparison.Ordinal)) // An instance with the same flow and idempotency key exists
-        );
+                x.IdempotencyKey == instance.IdempotencyKey),
+            cancellationToken);
 
         if (existing != null)
         {
@@ -49,7 +49,8 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
             CreatedAt = instance.CreatedAt,
             CompletedAt = instance.CompletedAt,
             UpdatedAt = instance.UpdatedAt,
-        });
+        }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private readonly static Expression<Func<FlowInstanceEntity, FlowInstanceRecord>> Transformer = x => new FlowInstanceRecord
@@ -91,7 +92,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
 
         return await context.FlowInstances.Where(existing =>
             existing.FlowName == flowName.Value &&
-            string.Equals(existing.IdempotencyKey, idempotencyKey, StringComparison.Ordinal))
+            existing.IdempotencyKey == idempotencyKey)
             .Select(Transformer)
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
     }
@@ -110,7 +111,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
                 instance.Status != FlowInstanceStatus.TimedOut)
             .OrderBy(instance => instance.UpdatedAt)
             .ThenBy(instance => instance.CreatedAt)
-            .ThenBy(instance => instance.InstanceId, StringComparer.Ordinal)
+            .ThenBy(instance => instance.InstanceId)
             .Take(maxCount)
             .Select(Transformer)
             .ToArrayAsync(cancellationToken: cancellationToken);

@@ -24,6 +24,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
             ExpiresAt = wait.ExpiresAt,
             CompletedAt = wait.CompletedAt,
         }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask<IReadOnlyList<SignalWaitRecord>> GetOpenWaitsAsync(
@@ -82,6 +83,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
             Payload = signal.Payload,
             RaisedAt = signal.RaisedAt,
         }, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<SignalRecord>> GetSignals()

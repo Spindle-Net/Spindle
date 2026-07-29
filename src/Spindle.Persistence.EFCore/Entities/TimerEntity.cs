@@ -9,8 +9,6 @@ internal class TimerEntity
 
     public required string StepId { get; init; }
 
-    public StepInstanceEntity? Step { get; set; }
-
     public required DateTimeOffset DueAt { get; set; }
 
     public required DateTimeOffset CreatedAt { get; init; }

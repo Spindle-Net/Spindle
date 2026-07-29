@@ -9,7 +9,6 @@ internal class StepAttemptEntity
 
     public required string StepId { get; init; }
 
-    public StepInstanceEntity? Step { get; set; }
     [Key]
     public required string AttemptId { get; init; }
 
@@ -17,11 +16,11 @@ internal class StepAttemptEntity
 
     public required string WorkerId { get; init; }
 
-    public required StepStatus Status { get; init; }
+    public required StepStatus Status { get; set; }
 
     public required DateTimeOffset StartedAt { get; init; }
 
-    public DateTimeOffset? CompletedAt { get; init; }
+    public DateTimeOffset? CompletedAt { get; set; }
 
-    public string? Error { get; init; }
+    public string? Error { get; set; }
 }

@@ -21,6 +21,4 @@ internal class FlowDefinitionEntity
 
     public required DateTimeOffset UpdatedAt { get; set; }
 
-    public ICollection<FlowInstanceEntity>? Instances { get; set; }
-
 }

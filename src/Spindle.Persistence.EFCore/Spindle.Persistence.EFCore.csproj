@@ -2,11 +2,16 @@
 
     <PropertyGroup>
         <Description>EntityFrameworkCore persistence provider for Spindle.Net.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Spindle.Abstractions\Spindle.Abstractions.csproj" />
       <ProjectReference Include="..\Spindle.Persistence.Abstractions\Spindle.Persistence.Abstractions.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">

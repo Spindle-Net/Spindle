@@ -33,6 +33,8 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
                 FiredAt = timer.FiredAt,
             }, cancellationToken);
         }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private readonly static Expression<Func<TimerEntity, TimerRecord>> Translation = x => new TimerRecord
