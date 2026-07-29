@@ -7,9 +7,8 @@ using Spindle.Persistence.Signals;
 using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 using Spindle.Persistence.EFCore.Stores;
-using Spindle.Persistence.EFCore;
 
-namespace Spindle.Persistence.InMemory;
+namespace Spindle.Persistence.EFCore;
 
 internal class EFCoreSpindleStore : ISpindleStore
 {
