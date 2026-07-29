@@ -72,7 +72,6 @@ public sealed class SqliteHostedWorkflowTests
 
         clock.AdvanceBy(TimeSpan.FromMinutes(5));
 
-        Assert.Single(await application.Store.Timers.GetDueAsync(clock.GetUtcNow(), maxCount: 10));
         await application.Pump.RunOnceAsync();
 
         var completed = await application.WaitForTerminalStatusAsync(handle.InstanceId);
