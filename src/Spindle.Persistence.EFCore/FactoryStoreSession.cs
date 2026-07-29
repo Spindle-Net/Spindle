@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.FlowDefinitions;
@@ -152,8 +153,34 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
     private sealed class InboxStore(EFCoreSpindleStore store) : IInboxStore
     {
-        public ValueTask<bool> TryRecordAsync(InboxMessageRecord message, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Inbox.TryRecordAsync(message, token), cancellationToken);
+        public async ValueTask<bool> TryRecordAsync(
+            InboxMessageRecord message,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await store
+                    .ExecuteAsync(
+                        (session, token) => session.Inbox.TryRecordAsync(message, token),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (DbUpdateException)
+            {
+                var existing = await store
+                    .ExecuteAsync(
+                        (session, token) => session.Inbox.GetAsync(message.MessageId, token),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (existing != null)
+                {
+                    return false;
+                }
+
+                throw;
+            }
+        }
 
         public ValueTask<InboxMessageRecord?> GetAsync(string messageId, CancellationToken cancellationToken = default) =>
             store.ExecuteAsync((session, token) => session.Inbox.GetAsync(messageId, token), cancellationToken);
@@ -161,11 +188,31 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
     private sealed class LeaseStore(EFCoreSpindleStore store) : ILeaseStore
     {
-        public ValueTask<bool> TryAcquireStepLeaseAsync(StepLeaseRecord lease, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Leases.TryAcquireStepLeaseAsync(lease, token), cancellationToken);
+        public async ValueTask<bool> TryAcquireStepLeaseAsync(
+            StepLeaseRecord lease,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return await TryAcquireAsync(lease, cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException)
+            {
+                return await TryAcquireAsync(lease, cancellationToken).ConfigureAwait(false);
+            }
+        }
 
         public ValueTask ReleaseStepLeaseAsync(FlowInstanceId flowInstanceId, StepId stepId, string owner, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Leases.ReleaseStepLeaseAsync(flowInstanceId, stepId, owner, token), cancellationToken);
+
+        private ValueTask<bool> TryAcquireAsync(
+            StepLeaseRecord lease,
+            CancellationToken cancellationToken)
+        {
+            return store.ExecuteAsync(
+                (session, token) => session.Leases.TryAcquireStepLeaseAsync(lease, token),
+                cancellationToken);
+        }
     }
 
     private sealed class ExecutionHistoryStore(EFCoreSpindleStore store) : IExecutionHistoryStore

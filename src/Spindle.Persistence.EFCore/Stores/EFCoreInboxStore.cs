@@ -13,14 +13,6 @@ internal sealed class EFCoreInboxStore(SpindleDbContext context) : IInboxStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Check if we already have it stored
-        if (await context.InboxMessages
-                .AsNoTracking()
-                .AnyAsync(x => x.MessageId == message.MessageId,
-                    cancellationToken: cancellationToken))
-            return false;
-
-        // It doesn't exist, so we add it
         await context.InboxMessages.AddAsync(new InboxMessageEntity
         {
             MessageId = message.MessageId,

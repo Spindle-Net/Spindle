@@ -14,38 +14,42 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var existing = await context.StepLeases.
-            FirstOrDefaultAsync(x => x.FlowInstanceId == lease.FlowInstanceId.Value &&
-                                     x.StepId == lease.StepId.Value, cancellationToken: cancellationToken);
+        var updated = await context.StepLeases
+            .Where(existing =>
+                existing.FlowInstanceId == lease.FlowInstanceId.Value &&
+                existing.StepId == lease.StepId.Value &&
+                (existing.Owner == lease.Owner || existing.ExpiresAt <= lease.AcquiredAt))
+            .ExecuteUpdateAsync(
+                update => update
+                    .SetProperty(existing => existing.Owner, lease.Owner)
+                    .SetProperty(existing => existing.AcquiredAt, lease.AcquiredAt)
+                    .SetProperty(existing => existing.ExpiresAt, lease.ExpiresAt),
+                cancellationToken);
 
-        if (existing != null &&
-            existing.ExpiresAt > lease.AcquiredAt &&
-            !string.Equals(existing.Owner, lease.Owner, StringComparison.Ordinal))
+        if (updated > 0)
         {
-            return false; // Already allotted to another owner
-        }
-
-        // No lease, create it
-        if (existing == null)
-        {
-            await context.StepLeases.AddAsync(new StepLeaseEntity
-            {
-                FlowInstanceId = lease.FlowInstanceId.Value,
-                StepId = lease.StepId.Value,
-
-                Owner = lease.Owner,
-                AcquiredAt = lease.AcquiredAt,
-                ExpiresAt = lease.ExpiresAt,
-            }, cancellationToken);
-            await context.SaveChangesAsync(cancellationToken);
             return true;
         }
 
-        // Existing found, update the lifetime and owner
-        existing.Owner = lease.Owner;
-        existing.AcquiredAt = lease.AcquiredAt;
-        existing.ExpiresAt = lease.ExpiresAt;
+        if (await context.StepLeases.AnyAsync(
+                existing =>
+                    existing.FlowInstanceId == lease.FlowInstanceId.Value &&
+                    existing.StepId == lease.StepId.Value,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        await context.StepLeases.AddAsync(new StepLeaseEntity
+        {
+            FlowInstanceId = lease.FlowInstanceId.Value,
+            StepId = lease.StepId.Value,
+            Owner = lease.Owner,
+            AcquiredAt = lease.AcquiredAt,
+            ExpiresAt = lease.ExpiresAt,
+        }, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
+
         return true;
     }
 

@@ -109,6 +109,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         Error = x.Error,
         Attempt = x.Attempt,
         RetryAt = x.RetryAt,
+        StartedAt = x.StartedAt,
         CompletedAt = x.CompletedAt,
         CreatedAt = x.CreatedAt,
         UpdatedAt = x.UpdatedAt,
