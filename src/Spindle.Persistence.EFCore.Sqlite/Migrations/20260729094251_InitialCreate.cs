@@ -19,7 +19,9 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     FlowInstanceId = table.Column<string>(type: "TEXT", nullable: false),
                     StepId = table.Column<string>(type: "TEXT", nullable: true),
                     EventType = table.Column<string>(type: "TEXT", nullable: false),
-                    Payload = table.Column<string>(type: "TEXT", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "TEXT", nullable: true),
+                    Payload_TypeName = table.Column<string>(type: "TEXT", nullable: true),
+                    Payload_Data = table.Column<byte[]>(type: "BLOB", nullable: true),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
@@ -35,7 +37,9 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     FlowVersion = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "TEXT", nullable: false),
                     FlowTypeName = table.Column<string>(type: "TEXT", nullable: false),
-                    Definition = table.Column<string>(type: "TEXT", nullable: true),
+                    Definition_ContentType = table.Column<string>(type: "TEXT", nullable: true),
+                    Definition_TypeName = table.Column<string>(type: "TEXT", nullable: true),
+                    Definition_Data = table.Column<byte[]>(type: "BLOB", nullable: true),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
                     UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
@@ -53,14 +57,18 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     FlowVersion = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "TEXT", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
-                    Input = table.Column<string>(type: "TEXT", nullable: false),
-                    Result = table.Column<string>(type: "TEXT", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "TEXT", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "TEXT", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "BLOB", nullable: true),
                     Error = table.Column<string>(type: "TEXT", nullable: true),
                     CorrelationKey = table.Column<string>(type: "TEXT", nullable: true),
                     IdempotencyKey = table.Column<string>(type: "TEXT", maxLength: 255, nullable: true),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
                     CompletedAt = table.Column<long>(type: "INTEGER", nullable: true),
-                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    Input_ContentType = table.Column<string>(type: "TEXT", nullable: false),
+                    Input_Data = table.Column<byte[]>(type: "BLOB", nullable: false),
+                    Input_TypeName = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -73,9 +81,11 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                 {
                     MessageId = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "TEXT", nullable: false),
-                    Payload = table.Column<string>(type: "TEXT", nullable: false),
                     ReceivedAt = table.Column<long>(type: "INTEGER", nullable: false),
-                    ProcessedAt = table.Column<long>(type: "INTEGER", nullable: true)
+                    ProcessedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "TEXT", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "BLOB", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -88,10 +98,12 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                 {
                     MessageId = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "TEXT", nullable: false),
-                    Payload = table.Column<string>(type: "TEXT", nullable: false),
                     Headers = table.Column<string>(type: "TEXT", nullable: false),
                     CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
-                    PublishedAt = table.Column<long>(type: "INTEGER", nullable: true)
+                    PublishedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "TEXT", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "BLOB", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -107,8 +119,10 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     SignalName = table.Column<string>(type: "TEXT", nullable: false),
                     CorrelationKey = table.Column<string>(type: "TEXT", nullable: true),
                     FlowInstanceId = table.Column<string>(type: "TEXT", nullable: true),
-                    Payload = table.Column<string>(type: "TEXT", nullable: false),
-                    RaisedAt = table.Column<long>(type: "INTEGER", nullable: false)
+                    RaisedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    Payload_ContentType = table.Column<string>(type: "TEXT", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "BLOB", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -164,8 +178,12 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     Queue = table.Column<string>(type: "TEXT", nullable: true),
                     DispatchMode = table.Column<int>(type: "INTEGER", nullable: false),
                     Dependencies = table.Column<string>(type: "TEXT", nullable: false),
-                    Input = table.Column<string>(type: "TEXT", nullable: true),
-                    Result = table.Column<string>(type: "TEXT", nullable: true),
+                    Input_ContentType = table.Column<string>(type: "TEXT", nullable: true),
+                    Input_TypeName = table.Column<string>(type: "TEXT", nullable: true),
+                    Input_Data = table.Column<byte[]>(type: "BLOB", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "TEXT", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "TEXT", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "BLOB", nullable: true),
                     Error = table.Column<string>(type: "TEXT", nullable: true),
                     Attempt = table.Column<int>(type: "INTEGER", nullable: false),
                     RetryAt = table.Column<long>(type: "INTEGER", nullable: true),

@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -20,8 +22,10 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     FlowInstanceId = table.Column<string>(type: "text", nullable: false),
                     StepId = table.Column<string>(type: "text", nullable: true),
                     EventType = table.Column<string>(type: "text", nullable: false),
-                    Payload = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false)
+                    Payload_ContentType = table.Column<string>(type: "text", nullable: true),
+                    Payload_TypeName = table.Column<string>(type: "text", nullable: true),
+                    Payload_Data = table.Column<byte[]>(type: "bytea", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -36,9 +40,11 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     FlowVersion = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "text", nullable: false),
                     FlowTypeName = table.Column<string>(type: "text", nullable: false),
-                    Definition = table.Column<string>(type: "text", nullable: true),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    UpdatedAt = table.Column<long>(type: "bigint", nullable: false)
+                    Definition_ContentType = table.Column<string>(type: "text", nullable: true),
+                    Definition_TypeName = table.Column<string>(type: "text", nullable: true),
+                    Definition_Data = table.Column<byte[]>(type: "bytea", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -54,14 +60,18 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     FlowVersion = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "text", nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
-                    Input = table.Column<string>(type: "text", nullable: false),
-                    Result = table.Column<string>(type: "text", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "text", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "text", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "bytea", nullable: true),
                     Error = table.Column<string>(type: "text", nullable: true),
                     CorrelationKey = table.Column<string>(type: "text", nullable: true),
                     IdempotencyKey = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    CompletedAt = table.Column<long>(type: "bigint", nullable: true),
-                    UpdatedAt = table.Column<long>(type: "bigint", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Input_ContentType = table.Column<string>(type: "text", nullable: false),
+                    Input_Data = table.Column<byte[]>(type: "bytea", nullable: false),
+                    Input_TypeName = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -74,9 +84,11 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                 {
                     MessageId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "text", nullable: false),
-                    Payload = table.Column<string>(type: "text", nullable: false),
-                    ReceivedAt = table.Column<long>(type: "bigint", nullable: false),
-                    ProcessedAt = table.Column<long>(type: "bigint", nullable: true)
+                    ReceivedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ProcessedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "text", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "bytea", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -89,10 +101,12 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                 {
                     MessageId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "text", nullable: false),
-                    Payload = table.Column<string>(type: "text", nullable: false),
-                    Headers = table.Column<string>(type: "text", nullable: false),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    PublishedAt = table.Column<long>(type: "bigint", nullable: true)
+                    Headers = table.Column<string>(type: "jsonb", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    PublishedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "text", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "bytea", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -108,8 +122,10 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     SignalName = table.Column<string>(type: "text", nullable: false),
                     CorrelationKey = table.Column<string>(type: "text", nullable: true),
                     FlowInstanceId = table.Column<string>(type: "text", nullable: true),
-                    Payload = table.Column<string>(type: "text", nullable: false),
-                    RaisedAt = table.Column<long>(type: "bigint", nullable: false)
+                    RaisedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    Payload_ContentType = table.Column<string>(type: "text", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "bytea", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -124,9 +140,9 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     StepId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     SignalName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     CorrelationKey = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    ExpiresAt = table.Column<long>(type: "bigint", nullable: true),
-                    CompletedAt = table.Column<long>(type: "bigint", nullable: true)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -143,8 +159,8 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     Attempt = table.Column<int>(type: "integer", nullable: false),
                     WorkerId = table.Column<string>(type: "text", nullable: false),
                     Status = table.Column<int>(type: "integer", nullable: false),
-                    StartedAt = table.Column<long>(type: "bigint", nullable: false),
-                    CompletedAt = table.Column<long>(type: "bigint", nullable: true),
+                    StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Error = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
@@ -164,16 +180,20 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     HandlerId = table.Column<string>(type: "text", nullable: true),
                     Queue = table.Column<string>(type: "text", nullable: true),
                     DispatchMode = table.Column<int>(type: "integer", nullable: false),
-                    Dependencies = table.Column<string>(type: "text", nullable: false),
-                    Input = table.Column<string>(type: "text", nullable: true),
-                    Result = table.Column<string>(type: "text", nullable: true),
+                    Dependencies = table.Column<List<string>>(type: "text[]", nullable: false),
+                    Input_ContentType = table.Column<string>(type: "text", nullable: true),
+                    Input_TypeName = table.Column<string>(type: "text", nullable: true),
+                    Input_Data = table.Column<byte[]>(type: "bytea", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "text", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "text", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "bytea", nullable: true),
                     Error = table.Column<string>(type: "text", nullable: true),
                     Attempt = table.Column<int>(type: "integer", nullable: false),
-                    RetryAt = table.Column<long>(type: "bigint", nullable: true),
-                    StartedAt = table.Column<long>(type: "bigint", nullable: true),
-                    CompletedAt = table.Column<long>(type: "bigint", nullable: true),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    UpdatedAt = table.Column<long>(type: "bigint", nullable: false)
+                    RetryAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -187,8 +207,8 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     FlowInstanceId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     StepId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Owner = table.Column<string>(type: "text", nullable: false),
-                    AcquiredAt = table.Column<long>(type: "bigint", nullable: false),
-                    ExpiresAt = table.Column<long>(type: "bigint", nullable: false)
+                    AcquiredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -201,9 +221,9 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                 {
                     FlowInstanceId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     StepId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    DueAt = table.Column<long>(type: "bigint", nullable: false),
-                    CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    FiredAt = table.Column<long>(type: "bigint", nullable: true)
+                    DueAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    FiredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {

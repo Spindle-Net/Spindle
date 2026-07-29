@@ -5,7 +5,7 @@ namespace Spindle.Persistence.EFCore.Entities;
 internal class SignalEntity
 {
     public int Id { get; set; }
-    
+
     public required string SignalName { get; init; }
 
     public string? CorrelationKey { get; init; }

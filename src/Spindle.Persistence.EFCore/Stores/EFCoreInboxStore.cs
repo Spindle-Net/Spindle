@@ -16,7 +16,7 @@ internal sealed class EFCoreInboxStore(SpindleDbContext context) : IInboxStore
         // Check if we already have it stored
         if (await context.InboxMessages
                 .AsNoTracking()
-                .AnyAsync(x => x.MessageId == message.MessageId, 
+                .AnyAsync(x => x.MessageId == message.MessageId,
                     cancellationToken: cancellationToken))
             return false;
 

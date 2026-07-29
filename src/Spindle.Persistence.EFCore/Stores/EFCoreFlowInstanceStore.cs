@@ -90,9 +90,11 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return await context.FlowInstances.Where(existing =>
-            existing.FlowName == flowName.Value &&
-            existing.IdempotencyKey == idempotencyKey)
+        return await context.FlowInstances
+            .AsNoTracking()
+            .Where(existing =>
+                existing.FlowName == flowName.Value &&
+                existing.IdempotencyKey == idempotencyKey)
             .Select(Transformer)
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
     }
@@ -104,7 +106,8 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         cancellationToken.ThrowIfCancellationRequested();
 
         return await context.FlowInstances
-            .Where(instance => 
+            .AsNoTracking()
+            .Where(instance =>
                 instance.Status != FlowInstanceStatus.Completed &&
                 instance.Status != FlowInstanceStatus.Failed &&
                 instance.Status != FlowInstanceStatus.Cancelled &&
@@ -127,7 +130,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
 
         await context.FlowInstances
             .Where(x => x.InstanceId == instanceId.Value)
-            .ExecuteUpdateAsync(x => 
+            .ExecuteUpdateAsync(x =>
                 x
                     .SetProperty(y => y.Status, _ => status)
                     .SetProperty(x => x.UpdatedAt, _ => updatedAt)
@@ -142,16 +145,23 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        await context.FlowInstances
-            .Where(x => x.InstanceId == instanceId.Value)
-            .ExecuteUpdateAsync(x =>
-                x
-                    .SetProperty(y => y.Status, _ => FlowInstanceStatus.Completed)
-                    .SetProperty(x => x.Result, _ => result)
-                    .SetProperty(x => x.Error, _ => null)
-                    .SetProperty(x => x.CompletedAt, _ => completedAt)
-                    .SetProperty(x => x.UpdatedAt, _ => completedAt)
-                , cancellationToken: cancellationToken);
+        var instance = await context.FlowInstances
+            .FirstOrDefaultAsync(
+                x => x.InstanceId == instanceId.Value,
+                cancellationToken);
+
+        if (instance == null)
+        {
+            return;
+        }
+
+        instance.Status = FlowInstanceStatus.Completed;
+        instance.Result = result;
+        instance.Error = null;
+        instance.CompletedAt = completedAt;
+        instance.UpdatedAt = completedAt;
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask MarkFailedAsync(

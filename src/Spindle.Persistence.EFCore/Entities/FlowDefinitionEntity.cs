@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Snapshot;
+using System.ComponentModel.DataAnnotations;
 
 namespace Spindle.Persistence.EFCore.Entities;
 
@@ -7,8 +8,10 @@ namespace Spindle.Persistence.EFCore.Entities;
 internal class FlowDefinitionEntity
 {
 
+    [MaxLength(255)]
     public required string FlowName { get; init; }
 
+    [MaxLength(255)]
     public required string FlowVersion { get; init; }
 
     public required string DefinitionHash { get; set; }

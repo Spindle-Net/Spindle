@@ -22,7 +22,8 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         {
             existing.DueAt = timer.DueAt;
             existing.FiredAt = timer.FiredAt;
-        } else
+        }
+        else
         {
             await context.Timers.AddAsync(new Entities.TimerEntity
             {

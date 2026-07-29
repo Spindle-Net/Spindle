@@ -16,7 +16,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         cancellationToken.ThrowIfCancellationRequested();
 
         var existing = await context.FlowDefinitions.FirstOrDefaultAsync(x =>
-            x.FlowName == definition.FlowName.Value && x.FlowVersion == definition.FlowVersion.Value, 
+            x.FlowName == definition.FlowName.Value && x.FlowVersion == definition.FlowVersion.Value,
             cancellationToken: cancellationToken);
 
         if (existing == null)
@@ -52,6 +52,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         cancellationToken.ThrowIfCancellationRequested();
 
         return await context.FlowDefinitions
+            .AsNoTracking()
             .Where(x => x.FlowName == flowName.Value && x.FlowVersion == flowVersion.Value)
             .Select(Translation)
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
@@ -64,6 +65,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         cancellationToken.ThrowIfCancellationRequested();
 
         return await context.FlowDefinitions
+            .AsNoTracking()
             .Where(x => x.FlowName == flowName.Value)
             .OrderBy(x => x.FlowVersion)
             .Select(Translation)

@@ -277,23 +277,22 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var exists = await context.StepInstances
-            .AnyAsync(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value, cancellationToken);
+        var step = await context.StepInstances
+            .FirstOrDefaultAsync(
+                x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value,
+                cancellationToken);
 
-        if (!exists) throw new InvalidOperationException(
+        if (step == null) throw new InvalidOperationException(
                 $"Step '{stepId}' does not exist for flow instance '{flowInstanceId}'.");
 
-        await context.StepInstances
-            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(x => x.Status, _ => StepStatus.Completed)
-                .SetProperty(x => x.Result, _ => result)
-                .SetProperty(x => x.Error, _ => null)
-                .SetProperty(x => x.CompletedAt, _ => completedAt)
-                .SetProperty(x => x.UpdatedAt, _ => completedAt)
-            , cancellationToken);
+        step.Status = StepStatus.Completed;
+        step.Result = result;
+        step.Error = null;
+        step.CompletedAt = completedAt;
+        step.UpdatedAt = completedAt;
 
         await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Completed, completedAt, null);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask MarkFailedAsync(

@@ -10,6 +10,7 @@ internal class StepAttemptEntity
     public required string StepId { get; init; }
 
     [Key]
+    [MaxLength(255)]
     public required string AttemptId { get; init; }
 
     public required int Attempt { get; init; }

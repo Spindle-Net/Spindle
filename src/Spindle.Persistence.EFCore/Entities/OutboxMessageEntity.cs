@@ -1,11 +1,14 @@
 ﻿using Spindle.Abstractions.Snapshot;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Spindle.Persistence.EFCore.Entities;
 
+[Index(nameof(PublishedAt), nameof(CreatedAt))]
 internal class OutboxMessageEntity
 {
     [Key]
+    [MaxLength(255)]
     public required string MessageId { get; init; }
 
     public required string Kind { get; init; }

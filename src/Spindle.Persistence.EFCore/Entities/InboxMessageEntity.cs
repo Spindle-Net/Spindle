@@ -9,6 +9,7 @@ namespace Spindle.Persistence.EFCore.Entities;
 internal class InboxMessageEntity
 {
     [Key]
+    [MaxLength(255)]
     public required string MessageId { get; set; }
 
     public required string Kind { get; set; }

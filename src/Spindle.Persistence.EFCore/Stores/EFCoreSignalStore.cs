@@ -62,10 +62,10 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         cancellationToken.ThrowIfCancellationRequested();
 
         await context.SignalWaits
-            .Where(x => x.FlowInstanceId == flowInstanceId.Value && 
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value &&
                         x.StepId == stepId.Value)
             .ExecuteUpdateAsync(
-                x => x.SetProperty(y => y.CompletedAt, _ => completedAt), 
+                x => x.SetProperty(y => y.CompletedAt, _ => completedAt),
                 cancellationToken: cancellationToken);
     }
 
@@ -89,6 +89,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
     public async Task<IReadOnlyList<SignalRecord>> GetSignals()
     {
         return await context.Signals
+            .AsNoTracking()
             .Select(x => new SignalRecord
             {
                 SignalName = new SignalName(x.SignalName),

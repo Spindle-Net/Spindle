@@ -1,13 +1,18 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Steps;
+using System.ComponentModel.DataAnnotations;
 
 namespace Spindle.Persistence.EFCore.Entities;
 
 [PrimaryKey(nameof(FlowInstanceId), nameof(StepId))]
+[Index(nameof(Status), nameof(CreatedAt))]
 internal class StepInstanceEntity
 {
+    [MaxLength(255)]
     public required string FlowInstanceId { get; init; }
+
+    [MaxLength(255)]
     public required string StepId { get; init; }
 
     public required string Name { get; init; }
@@ -22,7 +27,7 @@ internal class StepInstanceEntity
 
     public StepDispatchMode DispatchMode { get; init; }
 
-    public IReadOnlyList<string> Dependencies { get; init; } = [];
+    public List<string> Dependencies { get; init; } = [];
 
     public SerializedPayload? Input { get; init; }
 

@@ -23,7 +23,9 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     FlowInstanceId = table.Column<string>(type: "longtext", nullable: false),
                     StepId = table.Column<string>(type: "longtext", nullable: true),
                     EventType = table.Column<string>(type: "longtext", nullable: false),
-                    Payload = table.Column<string>(type: "longtext", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "longtext", nullable: true),
+                    Payload_TypeName = table.Column<string>(type: "longtext", nullable: true),
+                    Payload_Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     CreatedAt = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
@@ -40,7 +42,9 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     FlowVersion = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "longtext", nullable: false),
                     FlowTypeName = table.Column<string>(type: "longtext", nullable: false),
-                    Definition = table.Column<string>(type: "longtext", nullable: true),
+                    Definition_ContentType = table.Column<string>(type: "longtext", nullable: true),
+                    Definition_TypeName = table.Column<string>(type: "longtext", nullable: true),
+                    Definition_Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     CreatedAt = table.Column<long>(type: "bigint", nullable: false),
                     UpdatedAt = table.Column<long>(type: "bigint", nullable: false)
                 },
@@ -59,14 +63,18 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     FlowVersion = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false),
                     DefinitionHash = table.Column<string>(type: "longtext", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
-                    Input = table.Column<string>(type: "longtext", nullable: false),
-                    Result = table.Column<string>(type: "longtext", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "longtext", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "longtext", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     Error = table.Column<string>(type: "longtext", nullable: true),
                     CorrelationKey = table.Column<string>(type: "longtext", nullable: true),
                     IdempotencyKey = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: true),
                     CreatedAt = table.Column<long>(type: "bigint", nullable: false),
                     CompletedAt = table.Column<long>(type: "bigint", nullable: true),
-                    UpdatedAt = table.Column<long>(type: "bigint", nullable: false)
+                    UpdatedAt = table.Column<long>(type: "bigint", nullable: false),
+                    Input_ContentType = table.Column<string>(type: "longtext", nullable: false),
+                    Input_Data = table.Column<byte[]>(type: "longblob", nullable: false),
+                    Input_TypeName = table.Column<string>(type: "longtext", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -80,9 +88,11 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     MessageId = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "longtext", nullable: false),
-                    Payload = table.Column<string>(type: "longtext", nullable: false),
                     ReceivedAt = table.Column<long>(type: "bigint", nullable: false),
-                    ProcessedAt = table.Column<long>(type: "bigint", nullable: true)
+                    ProcessedAt = table.Column<long>(type: "bigint", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "longtext", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "longblob", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "longtext", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -96,10 +106,12 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     MessageId = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false),
                     Kind = table.Column<string>(type: "longtext", nullable: false),
-                    Payload = table.Column<string>(type: "longtext", nullable: false),
-                    Headers = table.Column<string>(type: "longtext", nullable: false),
+                    Headers = table.Column<string>(type: "json", nullable: false),
                     CreatedAt = table.Column<long>(type: "bigint", nullable: false),
-                    PublishedAt = table.Column<long>(type: "bigint", nullable: true)
+                    PublishedAt = table.Column<long>(type: "bigint", nullable: true),
+                    Payload_ContentType = table.Column<string>(type: "longtext", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "longblob", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "longtext", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -116,8 +128,10 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     SignalName = table.Column<string>(type: "longtext", nullable: false),
                     CorrelationKey = table.Column<string>(type: "longtext", nullable: true),
                     FlowInstanceId = table.Column<string>(type: "longtext", nullable: true),
-                    Payload = table.Column<string>(type: "longtext", nullable: false),
-                    RaisedAt = table.Column<long>(type: "bigint", nullable: false)
+                    RaisedAt = table.Column<long>(type: "bigint", nullable: false),
+                    Payload_ContentType = table.Column<string>(type: "longtext", nullable: false),
+                    Payload_Data = table.Column<byte[]>(type: "longblob", nullable: false),
+                    Payload_TypeName = table.Column<string>(type: "longtext", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -175,9 +189,13 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     HandlerId = table.Column<string>(type: "longtext", nullable: true),
                     Queue = table.Column<string>(type: "longtext", nullable: true),
                     DispatchMode = table.Column<int>(type: "int", nullable: false),
-                    Dependencies = table.Column<string>(type: "longtext", nullable: false),
-                    Input = table.Column<string>(type: "longtext", nullable: true),
-                    Result = table.Column<string>(type: "longtext", nullable: true),
+                    Dependencies = table.Column<string>(type: "json", nullable: false),
+                    Input_ContentType = table.Column<string>(type: "longtext", nullable: true),
+                    Input_TypeName = table.Column<string>(type: "longtext", nullable: true),
+                    Input_Data = table.Column<byte[]>(type: "longblob", nullable: true),
+                    Result_ContentType = table.Column<string>(type: "longtext", nullable: true),
+                    Result_TypeName = table.Column<string>(type: "longtext", nullable: true),
+                    Result_Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     Error = table.Column<string>(type: "longtext", nullable: true),
                     Attempt = table.Column<int>(type: "int", nullable: false),
                     RetryAt = table.Column<long>(type: "bigint", nullable: true),

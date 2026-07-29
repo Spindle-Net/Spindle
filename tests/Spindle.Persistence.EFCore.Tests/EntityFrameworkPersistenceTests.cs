@@ -32,6 +32,13 @@ public sealed class EntityFrameworkPersistenceTests
         await using var provider = services.BuildServiceProvider();
         var database = provider.GetRequiredService<SpindleDbContext>();
         await database.Database.MigrateAsync();
+        await AssertPayloadColumnsAsync(databaseAnchor, "ExecutionHistories", "Payload");
+        await AssertPayloadColumnsAsync(databaseAnchor, "FlowDefinitions", "Definition");
+        await AssertPayloadColumnsAsync(databaseAnchor, "FlowInstances", "Input", "Result");
+        await AssertPayloadColumnsAsync(databaseAnchor, "InboxMessages", "Payload");
+        await AssertPayloadColumnsAsync(databaseAnchor, "OutboxMessages", "Payload");
+        await AssertPayloadColumnsAsync(databaseAnchor, "Signals", "Payload");
+        await AssertPayloadColumnsAsync(databaseAnchor, "StepInstances", "Input", "Result");
         var store = provider.GetRequiredService<ISpindleStore>();
         var now = DateTimeOffset.Parse("2026-07-29T12:00:00Z");
         var flowName = new FlowName("contract-flow");
@@ -167,5 +174,30 @@ public sealed class EntityFrameworkPersistenceTests
             CreatedAt = now.AddMinutes(1)
         });
         Assert.Equal(2, (await store.History.GetByFlowInstanceAsync(instanceId)).Count);
+    }
+
+    private static async Task AssertPayloadColumnsAsync(
+        SqliteConnection connection,
+        string tableName,
+        params string[] propertyNames)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info('{tableName}')";
+
+        var columns = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        foreach (var propertyName in propertyNames)
+        {
+            Assert.Contains($"{propertyName}_ContentType", columns);
+            Assert.Contains($"{propertyName}_TypeName", columns);
+            Assert.Contains($"{propertyName}_Data", columns);
+            Assert.DoesNotContain(propertyName, columns);
+        }
     }
 }

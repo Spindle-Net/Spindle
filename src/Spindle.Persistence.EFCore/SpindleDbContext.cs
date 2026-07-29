@@ -1,8 +1,7 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Persistence.EFCore.Configuration;
 using Spindle.Persistence.EFCore.Entities;
 
 namespace Spindle.Persistence.EFCore;
@@ -23,117 +22,178 @@ public sealed class SpindleDbContext(
     internal DbSet<StepLeaseEntity> StepLeases => Set<StepLeaseEntity>();
     internal DbSet<TimerEntity> Timers => Set<TimerEntity>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureConventions(
+        ModelConfigurationBuilder configurationBuilder)
     {
-        var payloadConverter = new ValueConverter<SerializedPayload, string>(
-            payload => JsonSerializer.Serialize(payload, JsonSerializerOptions.Default),
-            json => JsonSerializer.Deserialize<SerializedPayload>(json, JsonSerializerOptions.Default)!);
-        var payloadComparer = new ValueComparer<SerializedPayload>(
-            (left, right) =>
-                left != null && right != null &&
-                left.ContentType == right.ContentType &&
-                left.TypeName == right.TypeName &&
-                left.Data.SequenceEqual(right.Data),
-            payload => HashCode.Combine(
-                payload.ContentType,
-                payload.TypeName,
-                payload.Data.Length),
-            payload => new SerializedPayload
-            {
-                ContentType = payload.ContentType,
-                TypeName = payload.TypeName,
-                Data = payload.Data.ToArray()
-            });
-        var stringListConverter = new ValueConverter<IReadOnlyList<string>, string>(
-            values => JsonSerializer.Serialize(values, JsonSerializerOptions.Default),
-            json => JsonSerializer.Deserialize<List<string>>(json, JsonSerializerOptions.Default)!);
-        var stringListComparer = new ValueComparer<IReadOnlyList<string>>(
-            (left, right) => left != null && right != null && left.SequenceEqual(right),
-            values => values.Aggregate(0, HashCode.Combine),
-            values => values.ToArray());
-        var headersConverter = new ValueConverter<IReadOnlyDictionary<string, string>, string>(
-            values => JsonSerializer.Serialize(values, JsonSerializerOptions.Default),
-            json => JsonSerializer.Deserialize<Dictionary<string, string>>(json, JsonSerializerOptions.Default)!);
-        var headersComparer = new ValueComparer<IReadOnlyDictionary<string, string>>(
-            (left, right) => DictionariesEqual(left, right),
-            values => values.OrderBy(pair => pair.Key).Aggregate(
-                0,
-                (hash, pair) => HashCode.Combine(hash, pair.Key, pair.Value)),
-            values => new Dictionary<string, string>(values));
-        var dateTimeOffsetConverter = new ValueConverter<DateTimeOffset, long>(
-            value => value.UtcTicks,
-            value => new DateTimeOffset(value, TimeSpan.Zero));
-
-        ConfigurePayload(modelBuilder.Entity<ExecutionHistoryEntity>().Property(entity => entity.Payload));
-        ConfigurePayload(modelBuilder.Entity<FlowDefinitionEntity>().Property(entity => entity.Definition));
-        ConfigurePayload(modelBuilder.Entity<FlowInstanceEntity>().Property(entity => entity.Input));
-        ConfigurePayload(modelBuilder.Entity<FlowInstanceEntity>().Property(entity => entity.Result));
-        ConfigurePayload(modelBuilder.Entity<InboxMessageEntity>().Property(entity => entity.Payload));
-        ConfigurePayload(modelBuilder.Entity<OutboxMessageEntity>().Property(entity => entity.Payload));
-        ConfigurePayload(modelBuilder.Entity<SignalEntity>().Property(entity => entity.Payload));
-        ConfigurePayload(modelBuilder.Entity<StepInstanceEntity>().Property(entity => entity.Input));
-        ConfigurePayload(modelBuilder.Entity<StepInstanceEntity>().Property(entity => entity.Result));
-
-        modelBuilder.Entity<StepInstanceEntity>()
-            .Property(entity => entity.Dependencies)
-            .HasConversion(stringListConverter, stringListComparer);
-        modelBuilder.Entity<OutboxMessageEntity>()
-            .Property(entity => entity.Headers)
-            .HasConversion(headersConverter, headersComparer);
-
-        modelBuilder.Entity<FlowInstanceEntity>()
-            .HasIndex(entity => new { entity.FlowName, entity.IdempotencyKey })
-            .IsUnique();
-        modelBuilder.Entity<FlowInstanceEntity>().Property(entity => entity.FlowName).HasMaxLength(255);
-        modelBuilder.Entity<FlowInstanceEntity>().Property(entity => entity.FlowVersion).HasMaxLength(255);
-        modelBuilder.Entity<FlowInstanceEntity>().Property(entity => entity.IdempotencyKey).HasMaxLength(255);
-        modelBuilder.Entity<FlowInstanceEntity>()
-            .HasIndex(entity => new { entity.Status, entity.UpdatedAt });
-        modelBuilder.Entity<StepInstanceEntity>()
-            .HasIndex(entity => new { entity.Status, entity.CreatedAt });
-        modelBuilder.Entity<TimerEntity>()
-            .HasIndex(entity => new { entity.FiredAt, entity.DueAt });
-        modelBuilder.Entity<SignalWaitEntity>()
-            .HasIndex(entity => new { entity.SignalName, entity.CorrelationKey, entity.CompletedAt });
-        modelBuilder.Entity<SignalWaitEntity>().Property(entity => entity.SignalName).HasMaxLength(255);
-        modelBuilder.Entity<SignalWaitEntity>().Property(entity => entity.CorrelationKey).HasMaxLength(255);
-        modelBuilder.Entity<OutboxMessageEntity>()
-            .HasIndex(entity => new { entity.PublishedAt, entity.CreatedAt });
-
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
         {
-            foreach (var property in entityType.GetProperties())
-            {
-                if (property.ClrType == typeof(DateTimeOffset) ||
-                    property.ClrType == typeof(DateTimeOffset?))
-                {
-                    property.SetValueConverter(dateTimeOffsetConverter);
-                }
-
-                if (property.ClrType == typeof(string) &&
-                    (property.IsPrimaryKey() || property.IsForeignKey()))
-                {
-                    property.SetMaxLength(255);
-                }
-            }
+            configurationBuilder
+                .Properties<DateTimeOffset>()
+                .HaveConversion<DateTimeOffsetUtcConverter>();
+        }
+        else if (!UsesNativeDateTimeOffsetStorage())
+        {
+            configurationBuilder
+                .Properties<DateTimeOffset>()
+                .HaveConversion<DateTimeOffsetUtcTicksConverter>();
         }
 
-        void ConfigurePayload<TProperty>(
-            Microsoft.EntityFrameworkCore.Metadata.Builders.PropertyBuilder<TProperty> property)
+        if (Database.ProviderName == "MySql.EntityFrameworkCore")
         {
-            property.HasConversion(payloadConverter, payloadComparer);
+            configurationBuilder
+                .Properties<List<string>>()
+                .HaveConversion<StringListJsonConverter, StringListValueComparer>();
         }
+
+        configurationBuilder
+            .Properties<IReadOnlyDictionary<string, string>>()
+            .HaveConversion<StringDictionaryJsonConverter, StringDictionaryValueComparer>();
     }
 
-    private static bool DictionariesEqual(
-        IReadOnlyDictionary<string, string>? left,
-        IReadOnlyDictionary<string, string>? right)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        return left != null &&
-            right != null &&
-            left.Count == right.Count &&
-            left.All(pair =>
-                right.TryGetValue(pair.Key, out var value) &&
-                value == pair.Value);
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ExecutionHistoryEntity>(entity =>
+        {
+            entity.ToTable("ExecutionHistories");
+            entity.OwnsOne(
+                owner => owner.Payload,
+                payload => ConfigurePayload(payload, "Payload"));
+        });
+
+        modelBuilder.Entity<FlowDefinitionEntity>(entity =>
+        {
+            entity.ToTable("FlowDefinitions");
+            entity.OwnsOne(
+                owner => owner.Definition,
+                payload => ConfigurePayload(payload, "Definition"));
+        });
+
+        modelBuilder.Entity<FlowInstanceEntity>(entity =>
+        {
+            entity.ToTable("FlowInstances");
+            entity.ComplexProperty(
+                owner => owner.Input,
+                payload => ConfigurePayload(payload, "Input"));
+            entity.OwnsOne(
+                owner => owner.Result,
+                payload => ConfigurePayload(payload, "Result"));
+        });
+
+        modelBuilder.Entity<InboxMessageEntity>(entity =>
+        {
+            entity.ToTable("InboxMessages");
+            entity.ComplexProperty(
+                owner => owner.Payload,
+                payload => ConfigurePayload(payload, "Payload"));
+        });
+
+        modelBuilder.Entity<OutboxMessageEntity>(entity =>
+        {
+            entity.ToTable("OutboxMessages");
+            entity.ComplexProperty(
+                owner => owner.Payload,
+                payload => ConfigurePayload(payload, "Payload"));
+
+            var jsonColumnType = GetNativeJsonColumnType();
+            if (jsonColumnType != null)
+            {
+                entity
+                    .Property(owner => owner.Headers)
+                    .HasColumnType(jsonColumnType);
+            }
+        });
+
+        modelBuilder.Entity<SignalEntity>(entity =>
+        {
+            entity.ToTable("Signals");
+            entity.ComplexProperty(
+                owner => owner.Payload,
+                payload => ConfigurePayload(payload, "Payload"));
+        });
+
+        modelBuilder.Entity<SignalWaitEntity>(entity =>
+            entity.ToTable("SignalWaits"));
+
+        modelBuilder.Entity<StepAttemptEntity>(entity =>
+            entity.ToTable("StepAttempts"));
+
+        modelBuilder.Entity<StepInstanceEntity>(entity =>
+        {
+            entity.ToTable("StepInstances");
+
+            if (Database.ProviderName == "MySql.EntityFrameworkCore")
+            {
+                entity
+                    .Property(owner => owner.Dependencies)
+                    .HasColumnType("json");
+            }
+
+            entity.OwnsOne(
+                owner => owner.Input,
+                payload => ConfigurePayload(payload, "Input"));
+            entity.OwnsOne(
+                owner => owner.Result,
+                payload => ConfigurePayload(payload, "Result"));
+        });
+
+        modelBuilder.Entity<StepLeaseEntity>(entity =>
+            entity.ToTable("StepLeases"));
+
+        modelBuilder.Entity<TimerEntity>(entity =>
+            entity.ToTable("Timers"));
+    }
+
+    private static void ConfigurePayload<TOwner>(
+        OwnedNavigationBuilder<TOwner, SerializedPayload> payload,
+        string columnPrefix)
+        where TOwner : class
+    {
+        payload
+            .Property(value => value.ContentType)
+            .HasColumnName($"{columnPrefix}_ContentType");
+
+        payload
+            .Property(value => value.TypeName)
+            .HasColumnName($"{columnPrefix}_TypeName");
+
+        payload
+            .Property(value => value.Data)
+            .HasColumnName($"{columnPrefix}_Data");
+    }
+
+    private static void ConfigurePayload(
+        ComplexPropertyBuilder<SerializedPayload> payload,
+        string columnPrefix)
+    {
+        payload
+            .Property(value => value.ContentType)
+            .HasColumnName($"{columnPrefix}_ContentType");
+
+        payload
+            .Property(value => value.TypeName)
+            .HasColumnName($"{columnPrefix}_TypeName");
+
+        payload
+            .Property(value => value.Data)
+            .HasColumnName($"{columnPrefix}_Data");
+    }
+
+    private string? GetNativeJsonColumnType()
+    {
+        return Database.ProviderName switch
+        {
+            "Npgsql.EntityFrameworkCore.PostgreSQL" => "jsonb",
+            "MySql.EntityFrameworkCore" => "json",
+            _ => null
+        };
+    }
+
+    private bool UsesNativeDateTimeOffsetStorage()
+    {
+        return Database.ProviderName is
+            "Microsoft.EntityFrameworkCore.SqlServer" or
+            "Npgsql.EntityFrameworkCore.PostgreSQL";
     }
 }
