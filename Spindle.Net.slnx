@@ -13,6 +13,11 @@
   <Folder Name="/Persistence/">
     <Project Path="src/Spindle.Persistence.Abstractions/Spindle.Persistence.Abstractions.csproj" />
     <Project Path="src/Spindle.Persistence.InMemory/Spindle.Persistence.InMemory.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore/Spindle.Persistence.EFCore.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore.Sqlite/Spindle.Persistence.EFCore.Sqlite.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore.PostgreSQL/Spindle.Persistence.EFCore.PostgreSQL.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore.MySql/Spindle.Persistence.EFCore.MySql.csproj" />
+    <Project Path="src/Spindle.Persistence.EFCore.SqlServer/Spindle.Persistence.EFCore.SqlServer.csproj" />
   </Folder>
   <Folder Name="/Transport/">
     <Project Path="src/Spindle.Transport.Abstractions/Spindle.Transport.Abstractions.csproj" />
@@ -24,5 +29,6 @@
     <Project Path="tests/Spindle.Testing.Tests/Spindle.Testing.Tests.csproj" />
     <Project Path="tests/Spindle.Runtime.Tests/Spindle.Runtime.Tests.csproj" />
     <Project Path="tests/Spindle.Hosting.Tests/Spindle.Hosting.Tests.csproj" />
+    <Project Path="tests/Spindle.Persistence.EFCore.Tests/Spindle.Persistence.EFCore.Tests.csproj" />
   </Folder>
 </Solution>

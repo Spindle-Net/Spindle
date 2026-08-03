@@ -1,7 +1,6 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Spindle.Abstractions.Core;
 using Spindle.Example.Hosting;
 using Spindle.Hosting;
 using Spindle.Persistence;

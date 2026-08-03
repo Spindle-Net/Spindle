@@ -282,14 +282,6 @@ public sealed class InMemoryStepStore : IStepStore
         return ValueTask.CompletedTask;
     }
 
-    public IReadOnlyList<StepAttemptRecord> GetAttempts()
-    {
-        lock (_gate)
-        {
-            return _attempts.ToArray();
-        }
-    }
-
     private StepInstanceRecord GetRequired(FlowInstanceId flowInstanceId, StepId stepId)
     {
         return _steps.TryGetValue((flowInstanceId, stepId), out var step)
