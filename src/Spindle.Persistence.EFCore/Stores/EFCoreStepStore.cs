@@ -338,27 +338,24 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         DateTimeOffset updatedAt, 
         CancellationToken cancellationToken = default)
     {
-        //if (updatedSteps != null)
-        //{
-        //    // Do a limited update using the relationships of those entities
-        //    var updatedStepIds = updatedSteps.Select(x => x.Value).ToList();
-        //    var updated = await context.StepInstances
-        //        .Where(x => x.FlowInstanceId == flowInstanceId.Value)
+        if (updatedSteps is { Count: > 0 })
+        {
+            var updatedStepIds = updatedSteps.Select(x => x.Value).ToList();
 
-        //        // Limit the search space with respect to what we tell it has been updated
-        //        .Where(x => updatedStepIds.Contains(x.StepId))
-        //        .SelectMany(x => x.Dependents)
-        //        .Select(x => x.Step!)
-
-        //        .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
-        //        .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
-        //        .ExecuteUpdateAsync(u => u
-        //            .SetProperty(x => x.Status, _ => StepStatus.Ready)
-        //            .SetProperty(x => x.UpdatedAt, _ => updatedAt)
-        //        , cancellationToken);
-        //} 
-        //else
-        //{
+            // Keep StepInstances as the update root. ExecuteUpdateAsync cannot update a
+            // query whose target is reached through SelectMany over a navigation property.
+            await context.StepInstances
+                .Where(x => x.FlowInstanceId == flowInstanceId.Value)
+                .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
+                .Where(x => x.Dependencies.Any(y => updatedStepIds.Contains(y.DependsOnId)))
+                .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.Status, _ => StepStatus.Ready)
+                    .SetProperty(x => x.UpdatedAt, _ => updatedAt),
+                    cancellationToken);
+        }
+        else
+        {
             // Process the entire dependency graph
             await context.StepInstances
                 .Where(x => x.FlowInstanceId == flowInstanceId.Value)
@@ -368,7 +365,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
                     .SetProperty(x => x.Status, _ => StepStatus.Ready)
                     .SetProperty(x => x.UpdatedAt, _ => updatedAt)
                 , cancellationToken);
-        //}
+        }
     }
 
     private async Task CompleteLatestAttempt(

@@ -21,6 +21,55 @@ namespace Spindle.Persistence.EFCore.Tests;
 public sealed class EntityFrameworkPersistenceTests
 {
     [Fact]
+    public async Task MarkDependentsReadyAsync_UpdatesOnlyDependentsOfChangedSteps()
+    {
+        var connectionString = $"Data Source=SpindleDependencyTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        await using var databaseAnchor = new SqliteConnection(connectionString);
+        await databaseAnchor.OpenAsync();
+
+        var services = new ServiceCollection();
+        services.AddSpindleSqlite(connectionString);
+        await using var provider = services.BuildServiceProvider();
+        var database = provider.GetRequiredService<SpindleDbContext>();
+        await database.Database.MigrateAsync();
+
+        var store = provider.GetRequiredService<ISpindleStore>();
+        var now = DateTimeOffset.Parse("2026-08-03T12:00:00Z");
+        var flowInstanceId = new FlowInstanceId("dependency-instance");
+        var completedStepId = new StepId("completed");
+        var incompleteStepId = new StepId("incomplete");
+        var dependentStepId = new StepId("dependent");
+        var unrelatedStepId = new StepId("unrelated");
+
+        await store.Steps.CreateManyAsync(
+        [
+            CreateStep(completedStepId, StepStatus.Completed, []),
+            CreateStep(incompleteStepId, StepStatus.Pending, []),
+            CreateStep(dependentStepId, StepStatus.Pending, [completedStepId]),
+            CreateStep(unrelatedStepId, StepStatus.Pending, [incompleteStepId]),
+        ]);
+
+        await store.Steps.MarkDependentsReadyAsync(flowInstanceId, [completedStepId], now.AddMinutes(1));
+
+        Assert.Equal(StepStatus.Ready, (await store.Steps.GetAsync(flowInstanceId, dependentStepId))!.Status);
+        Assert.Equal(now.AddMinutes(1), (await store.Steps.GetAsync(flowInstanceId, dependentStepId))!.UpdatedAt);
+        Assert.Equal(StepStatus.Pending, (await store.Steps.GetAsync(flowInstanceId, unrelatedStepId))!.Status);
+
+        StepInstanceRecord CreateStep(StepId stepId, StepStatus status, List<StepId> dependencies) => new()
+        {
+            FlowInstanceId = flowInstanceId,
+            StepId = stepId,
+            Name = stepId.Value,
+            Kind = StepKind.Step,
+            Status = status,
+            DispatchMode = StepDispatchMode.LocalWorker,
+            Dependencies = dependencies,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+    }
+
+    [Fact]
     public async Task SqliteProvider_ImplementsPersistenceContracts()
     {
         var connectionString = $"Data Source=SpindlePersistenceTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
