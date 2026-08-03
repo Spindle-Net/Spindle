@@ -3,6 +3,7 @@ using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
+using Spindle.Persistence.Steps;
 
 namespace Spindle;
 
@@ -38,15 +39,14 @@ internal sealed class StepExecutor(
     {
         var executed = 0;
         var attempted = new HashSet<StepId>();
+        var steps = session
+            .GetStepsSnapshot()
+            .ToDictionary(step => step.StepId);
 
         while (attempted.Count < maxCount)
         {
             var remaining = maxCount - attempted.Count;
-            var steps = await store.Steps
-                .GetByFlowInstanceAsync(session.FlowInstanceId, cancellationToken)
-                .ConfigureAwait(false);
-
-            var readySteps = steps
+            var readySteps = steps.Values
                 .Where(step => step.Status == StepStatus.Ready && !attempted.Contains(step.StepId))
                 .OrderBy(step => step.CreatedAt)
                 .ThenBy(step => step.StepId.Value, StringComparer.Ordinal)
@@ -63,7 +63,7 @@ internal sealed class StepExecutor(
                 attempted.Add(step.StepId);
             }
 
-            var tasks = new List<Task>();
+            var tasks = new List<Task<(StepInstanceRecord Step, StepExecutionResult Result)>>();
 
             foreach (var step in readySteps)
             {
@@ -72,29 +72,67 @@ internal sealed class StepExecutor(
                 var executor = _executors.FirstOrDefault(e => e.SupportsDispatchMode(step.DispatchMode));
                 if (executor != null)
                 {
-                    var task = executor.ExecuteAsync(session, step, cancellationToken)
-                        .ContinueWith(task =>
-                        {
-                            if (task is { IsCompletedSuccessfully: true, Result: true })
-                            {
-                                Interlocked.Increment(ref executed);
-                            }
-                            else if (task.IsFaulted)
-                            {
-                                logger?.LogError(
-                                    task.Exception,
-                                    "Error executing step {StepId} for flow instance {FlowInstanceId}",
-                                    step.StepId,
-                                    step.FlowInstanceId);
-                            }
-                        }, cancellationToken);
+                    var task = ExecuteStepAsync(executor, session, step, cancellationToken);
                     tasks.Add(task);
                 }
             }
 
-            await Task.WhenAll(tasks);
+            foreach (var (step, result) in await Task.WhenAll(tasks).ConfigureAwait(false))
+            {
+                if (!result.Executed)
+                {
+                    continue;
+                }
+
+                executed++;
+
+                if (!result.Completed)
+                {
+                    steps[step.StepId] = step with { Status = StepStatus.Failed };
+                    session.UpsertStep(steps[step.StepId]);
+                    continue;
+                }
+
+                steps[step.StepId] = step with { Status = StepStatus.Completed };
+                session.UpsertStep(steps[step.StepId]);
+
+                foreach (var dependent in steps.Values
+                             .Where(candidate =>
+                                 (candidate.Status is StepStatus.Pending or StepStatus.Waiting) &&
+                                 candidate.Dependencies.All(dependency =>
+                                     steps.TryGetValue(dependency, out var prerequisite) &&
+                                     prerequisite.Status == StepStatus.Completed))
+                             .ToArray())
+                {
+                    steps[dependent.StepId] = dependent with { Status = StepStatus.Ready };
+                    session.UpsertStep(steps[dependent.StepId]);
+                }
+            }
         }
 
         return executed;
+    }
+
+    private async Task<(StepInstanceRecord Step, StepExecutionResult Result)> ExecuteStepAsync(
+        IStepExecutor executor,
+        FlowExecutionSession session,
+        StepInstanceRecord step,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return (step, await executor
+                .ExecuteAsync(session, step, cancellationToken)
+                .ConfigureAwait(false));
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(
+                exception,
+                "Error executing step {StepId} for flow instance {FlowInstanceId}",
+                step.StepId,
+                step.FlowInstanceId);
+            return (step, StepExecutionResult.Failed);
+        }
     }
 }

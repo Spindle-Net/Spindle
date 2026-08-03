@@ -49,7 +49,7 @@ public sealed class SpindleHostingTests
     }
 
     [Fact]
-    public async Task Pump_CompletesDependencyChainWithinConfiguredStepBudget()
+    public async Task Pump_CompletesDependencyChainInSingleScheduledAdvancement()
     {
         var harness = new SpindleTestHarness(
             hostOptions: new SpindleHostOptions
@@ -90,10 +90,11 @@ public sealed class SpindleHostingTests
             flowName,
             new TestRequest(38));
 
-        var snapshot = await harness.PumpUntilCompletedAsync(handle.InstanceId);
+        await harness.PumpUntilIdleAsync(maxIterations: 3);
+        var snapshot = await harness.GetSnapshotAsync(handle.InstanceId);
         var instance = await harness.Store.FlowInstances.GetAsync(handle.InstanceId);
 
-        Assert.Equal(FlowInstanceStatus.Completed, snapshot.Status);
+        Assert.Equal(FlowInstanceStatus.Completed, snapshot?.Status);
         Assert.NotNull(instance?.Result);
         Assert.Equal(new TestResult(42), harness.Serializer.Deserialize<TestResult>(instance.Result));
     }

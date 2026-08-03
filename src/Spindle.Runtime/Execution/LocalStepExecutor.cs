@@ -23,14 +23,14 @@ internal sealed class LocalStepExecutor(
 
 
 
-    public async Task<bool> ExecuteAsync(
+    public async Task<StepExecutionResult> ExecuteAsync(
         FlowExecutionSession session,
         StepInstanceRecord step,
         CancellationToken cancellationToken)
     {
         if (!session.TryGet(step.StepId, out var registration))
         {
-            return false;
+            return StepExecutionResult.NotExecuted;
         }
 
         if (step.DispatchMode == StepDispatchMode.Queued)
@@ -49,7 +49,7 @@ internal sealed class LocalStepExecutor(
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            return false;
+            return StepExecutionResult.NotExecuted;
         }
 
         if (step.DispatchMode is not (StepDispatchMode.Immediate or StepDispatchMode.LocalWorker))
@@ -67,7 +67,7 @@ internal sealed class LocalStepExecutor(
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            return false;
+            return StepExecutionResult.NotExecuted;
         }
 
         var attemptId = new StepAttemptId(Guid.NewGuid().ToString("N"));
@@ -131,7 +131,7 @@ internal sealed class LocalStepExecutor(
 
         if (running is null || running.Status != StepStatus.Running)
         {
-            return false;
+            return StepExecutionResult.NotExecuted;
         }
 
         try
@@ -182,6 +182,8 @@ internal sealed class LocalStepExecutor(
                 .ConfigureAwait(false);
 
             session.SetResult(step.StepId, result);
+
+            return StepExecutionResult.Succeeded;
         }
         catch (Exception exception)
         {
@@ -215,7 +217,7 @@ internal sealed class LocalStepExecutor(
             }
         }
 
-        return true;
+        return StepExecutionResult.Failed;
     }
 
     private async ValueTask<StepInputs> BuildInputsAsync(
