@@ -94,6 +94,7 @@ public sealed class EntityFrameworkPersistenceTests
         var flowVersion = new FlowVersion("1");
         var instanceId = new FlowInstanceId("instance-1");
         var stepId = new StepId("step-1");
+        var dependencyStepId = new StepId("dependency-1");
         var payload = new SerializedPayload
         {
             ContentType = "application/json",
@@ -127,26 +128,40 @@ public sealed class EntityFrameworkPersistenceTests
         Assert.NotNull(await store.FlowInstances.GetByIdempotencyKeyAsync(flowName, "idempotency-1"));
         Assert.Single(await store.FlowInstances.GetRunnableAsync(10));
 
-        await store.Steps.CreateAsync(new StepInstanceRecord
-        {
-            FlowInstanceId = instanceId,
-            StepId = stepId,
-            Name = "Step 1",
-            Kind = StepKind.Step,
-            Status = StepStatus.Ready,
-            DispatchMode = StepDispatchMode.LocalWorker,
-            Dependencies = [new StepId("dependency-1")],
-            Input = payload,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
+        await store.Steps.CreateManyAsync(
+        [
+            new StepInstanceRecord
+            {
+                FlowInstanceId = instanceId,
+                StepId = dependencyStepId,
+                Name = "Dependency step",
+                Kind = StepKind.Step,
+                Status = StepStatus.Completed,
+                DispatchMode = StepDispatchMode.LocalWorker,
+                CreatedAt = now,
+                UpdatedAt = now,
+            },
+            new StepInstanceRecord
+            {
+                FlowInstanceId = instanceId,
+                StepId = stepId,
+                Name = "Step 1",
+                Kind = StepKind.Step,
+                Status = StepStatus.Ready,
+                DispatchMode = StepDispatchMode.LocalWorker,
+                Dependencies = [dependencyStepId],
+                Input = payload,
+                CreatedAt = now,
+                UpdatedAt = now,
+            }
+        ]);
         Assert.Single(await store.Steps.GetReadyStepsAsync(1));
         await store.Steps.MarkRunningAsync(instanceId, stepId, new StepAttemptId("attempt-1"), "worker", now);
         await store.Steps.MarkCompletedAsync(instanceId, stepId, payload, now.AddMinutes(1));
         var step = await store.Steps.GetAsync(instanceId, stepId);
         Assert.Equal(1, step?.Attempt);
         Assert.Equal(now, step?.StartedAt);
-        Assert.Equal(new StepId("dependency-1"), Assert.Single(step!.Dependencies));
+        Assert.Equal(dependencyStepId, Assert.Single(step!.Dependencies));
 
         await store.Timers.CreateAsync(new TimerRecord
         {

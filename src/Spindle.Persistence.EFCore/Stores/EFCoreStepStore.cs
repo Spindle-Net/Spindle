@@ -109,7 +109,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         HandlerId = x.HandlerId != null ? new StepHandlerId(x.HandlerId) : null,
         Queue = x.Queue != null ? new QueueName(x.Queue) : null,
         DispatchMode = x.DispatchMode,
-        Dependencies = x.Dependencies.Select(y => new StepId(y.StepId)).ToList(),
+        Dependencies = x.Dependencies.Select(y => new StepId(y.DependsOnId)).ToList(),
         Input = x.Input,
         Result = x.Result,
         Error = x.Error,
@@ -130,6 +130,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
         var entity = await context.StepInstances
             .AsNoTracking()
+            .Include(x => x.Dependencies)
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
             .FirstOrDefaultAsync(cancellationToken);
 
