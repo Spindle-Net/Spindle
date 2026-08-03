@@ -47,8 +47,12 @@ public abstract class WorkflowBenchmarkBase : IDisposable
             var services = new ServiceCollection();
             services.AddSpindleSqlite(connectionString);
             _serviceProvider = services.BuildServiceProvider();
-            var database = _serviceProvider.GetRequiredService<SpindleDbContext>();
-            await database.Database.MigrateAsync();
+            var contextFactory = _serviceProvider.GetRequiredService<IDbContextFactory<SpindleDbContext>>();
+            await using (var database = await contextFactory.CreateDbContextAsync())
+            {
+                await database.Database.MigrateAsync();
+            }
+
             store = _serviceProvider.GetRequiredService<ISpindleStore>();
         }
 

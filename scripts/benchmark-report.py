@@ -148,7 +148,7 @@ def build_markdown(reports: list[dict[str, object]], output: Path) -> str:
     all_records = [record for report in reports for record in report["records"]]
     environment = reports[0]["environment"]
     providers = sorted({record["parameters"].get("Provider", "n/a") for record in all_records})
-    generated = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     lines = [
         "# Spindle.Net benchmark report",
