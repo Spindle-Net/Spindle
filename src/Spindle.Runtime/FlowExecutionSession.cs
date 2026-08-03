@@ -9,6 +9,7 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
 {
     private readonly Dictionary<StepId, StepExecutionRegistration> _registrations = [];
     private readonly Dictionary<StepId, StepInstanceRecord> _steps = [];
+    private readonly Dictionary<StepId, object?> _results = [];
     private readonly List<StepId> _pendingStepDeclarations = [];
 
     public FlowInstanceId FlowInstanceId { get; } = flowInstanceId;
@@ -21,6 +22,10 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
         _registrations.Clear();
         _steps.Clear();
         _pendingStepDeclarations.Clear();
+        lock (_results)
+        {
+            _results.Clear();
+        }
 
         foreach (var step in steps)
         {
@@ -57,6 +62,26 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
         out StepInstanceRecord step)
     {
         return _steps.TryGetValue(stepId, out step!);
+    }
+
+    public bool TryGetResult(
+        StepId stepId,
+        out object? result)
+    {
+        lock (_results)
+        {
+            return _results.TryGetValue(stepId, out result);
+        }
+    }
+
+    public void SetResult(
+        StepId stepId,
+        object? result)
+    {
+        lock (_results)
+        {
+            _results[stepId] = result;
+        }
     }
 
     public IReadOnlyList<StepInstanceRecord> GetStepsSnapshot()
