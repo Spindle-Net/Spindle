@@ -49,6 +49,56 @@ public sealed class SpindleHostingTests
     }
 
     [Fact]
+    public async Task Pump_CompletesDependencyChainWithinConfiguredStepBudget()
+    {
+        var harness = new SpindleTestHarness(
+            hostOptions: new SpindleHostOptions
+            {
+                MaxStepsPerFlowPerTick = 4,
+                WorkerId = "dependency-chain-worker"
+            });
+        var flowName = new FlowName("pump-completes-dependency-chain");
+
+        harness.RegisterFlow<TestRequest, TestResult>(
+            flowName,
+            async (context, request) =>
+            {
+                var first = context.Step<int>(
+                    "first",
+                    "First",
+                    () => ValueTask.FromResult(request.Value + 1));
+                var second = context.Step<int, int>(
+                    "second",
+                    "Second",
+                    first,
+                    value => ValueTask.FromResult(value + 1));
+                var third = context.Step<int, int>(
+                    "third",
+                    "Third",
+                    second,
+                    value => ValueTask.FromResult(value + 1));
+                var fourth = context.Step<int, int>(
+                    "fourth",
+                    "Fourth",
+                    third,
+                    value => ValueTask.FromResult(value + 1));
+
+                return new TestResult(await fourth);
+            });
+
+        var handle = await harness.StartFlowAsync<TestRequest, TestResult>(
+            flowName,
+            new TestRequest(38));
+
+        var snapshot = await harness.PumpUntilCompletedAsync(handle.InstanceId);
+        var instance = await harness.Store.FlowInstances.GetAsync(handle.InstanceId);
+
+        Assert.Equal(FlowInstanceStatus.Completed, snapshot.Status);
+        Assert.NotNull(instance?.Result);
+        Assert.Equal(new TestResult(42), harness.Serializer.Deserialize<TestResult>(instance.Result));
+    }
+
+    [Fact]
     public async Task Pump_FiresDueTimerAndCompletesFlow()
     {
         var initial = DateTimeOffset.Parse("2026-06-28T10:00:00Z");

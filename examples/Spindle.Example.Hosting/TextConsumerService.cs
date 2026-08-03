@@ -39,11 +39,11 @@ public sealed class TextConsumerService(
         {
             foreach (var (instanceId, text) in pending.ToArray())
             {
-                var snapshot = await runtime
-                    .GetInstanceAsync(instanceId, stoppingToken)
+                var instance = await store.FlowInstances
+                    .GetAsync(instanceId, stoppingToken)
                     .ConfigureAwait(false);
 
-                if (snapshot?.Status == FlowInstanceStatus.Completed)
+                if (instance?.Status == FlowInstanceStatus.Completed)
                 {
                     await PrintCompletedAsync(instanceId, text, stoppingToken)
                         .ConfigureAwait(false);
@@ -51,22 +51,12 @@ public sealed class TextConsumerService(
                     continue;
                 }
 
-                if (snapshot?.Status is FlowInstanceStatus.Failed
+                if (instance?.Status is FlowInstanceStatus.Failed
                     or FlowInstanceStatus.Cancelled
                     or FlowInstanceStatus.TimedOut)
                 {
-                    Console.WriteLine($"Failed: {instanceId} ({snapshot.Status}) <- {text}");
+                    Console.WriteLine($"Failed: {instanceId} ({instance.Status}) <- {text}");
                     pending.Remove(instanceId);
-                    continue;
-                }
-
-                Console.WriteLine($"Pending: {instanceId} ({snapshot?.Status}) <- {text}");
-                if (snapshot is not null)
-                {
-                    foreach (var step in snapshot.Steps)
-                    {
-                        Console.WriteLine($"  Step: {step.StepId} ({step.Status}) - {step.CompletedAt?.ToString("o") ?? "not completed"}");
-                    }
                 }
             }
 

@@ -45,11 +45,7 @@ public sealed class TextTransformFlow : ISpindleFlow<TextTransformRequest, TextT
             lastStep = ctx.Step(id: $"dummy-{i}",
                 name: $"Dummy Step {i}",
                 lastStep,
-                execute: async val =>
-                {
-                    await Task.Delay(1);
-                    return i1 + val;
-                });
+                execute: val => ValueTask.FromResult(i1 + val));
         }
 
 

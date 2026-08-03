@@ -13,7 +13,10 @@ public static class SpindleServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddDbContextFactory<SpindleDbContext>(configure);
+        services.AddPooledDbContextFactory<SpindleDbContext>(configure);
+        services.TryAddScoped<SpindleDbContext>(serviceProvider => serviceProvider
+            .GetRequiredService<IDbContextFactory<SpindleDbContext>>()
+            .CreateDbContext());
         services.TryAddSingleton<ISpindleStore, EFCoreSpindleStore>();
 
         return services;

@@ -72,61 +72,70 @@ internal sealed class LocalStepExecutor(
 
         var attemptId = new StepAttemptId(Guid.NewGuid().ToString("N"));
         var leaseAcquiredAt = timeProvider.GetUtcNow();
-
-        var acquired = await store
+        var running = await store
             .ExecuteAsync(
-                (storeSession, storeCancellationToken) =>
-                    storeSession.Leases.TryAcquireStepLeaseAsync(
-                        new StepLeaseRecord
-                        {
-                            FlowInstanceId = step.FlowInstanceId,
-                            StepId = step.StepId,
-                            Owner = workerId,
-                            AcquiredAt = leaseAcquiredAt,
-                            ExpiresAt = leaseAcquiredAt.Add(leaseDuration)
-                        },
-                        storeCancellationToken),
+                async (storeSession, storeCancellationToken) =>
+                {
+                    var acquired = await storeSession.Leases
+                        .TryAcquireStepLeaseAsync(
+                            new StepLeaseRecord
+                            {
+                                FlowInstanceId = step.FlowInstanceId,
+                                StepId = step.StepId,
+                                Owner = workerId,
+                                AcquiredAt = leaseAcquiredAt,
+                                ExpiresAt = leaseAcquiredAt.Add(leaseDuration)
+                            },
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (!acquired)
+                    {
+                        return null;
+                    }
+
+                    var current = await storeSession.Steps
+                        .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
+                        .ConfigureAwait(false)
+                        ?? step;
+
+                    if (current.Status != StepStatus.Ready)
+                    {
+                        await storeSession.Leases
+                            .ReleaseStepLeaseAsync(
+                                step.FlowInstanceId,
+                                step.StepId,
+                                workerId,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                        return null;
+                    }
+
+                    await storeSession.Steps
+                        .MarkRunningAsync(
+                            step.FlowInstanceId,
+                            step.StepId,
+                            attemptId,
+                            workerId,
+                            timeProvider.GetUtcNow(),
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+
+                    return await storeSession.Steps
+                        .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
+                        .ConfigureAwait(false)
+                        ?? step;
+                },
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (!acquired)
+        if (running is null || running.Status != StepStatus.Running)
         {
             return false;
         }
 
         try
         {
-            var running = await store
-                .ExecuteAsync(
-                    async (storeSession, storeCancellationToken) =>
-                    {
-                        var current = await storeSession.Steps
-                            .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
-                            .ConfigureAwait(false)
-                            ?? step;
-
-                        if (current.Status != StepStatus.Ready)
-                        {
-                            return current;
-                        }
-
-                        await storeSession.Steps
-                            .MarkRunningAsync(step.FlowInstanceId, step.StepId, attemptId, workerId, timeProvider.GetUtcNow(), storeCancellationToken)
-                            .ConfigureAwait(false);
-
-                        return await storeSession.Steps
-                            .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
-                            .ConfigureAwait(false)
-                            ?? step;
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            if (running.Status != StepStatus.Running)
-            {
-                return false;
-            }
-
             var stepLogger = new StepLogger(session, running, step, logger);
             var context = new DefaultStepExecutionContext(
                 step.FlowInstanceId,
@@ -137,7 +146,7 @@ internal sealed class LocalStepExecutor(
                 stepLogger,
                 cancellationToken);
 
-            var inputs = await BuildInputsAsync(running, registration, cancellationToken)
+            var inputs = await BuildInputsAsync(session, running, registration, cancellationToken)
                 .ConfigureAwait(false);
 
             // TODO: Make a difference of immediate and
@@ -160,43 +169,57 @@ internal sealed class LocalStepExecutor(
                         await scheduler
                             .MarkDependentsReadyAsync(storeSession, step.FlowInstanceId, storeCancellationToken)
                             .ConfigureAwait(false);
+
+                        await storeSession.Leases
+                            .ReleaseStepLeaseAsync(
+                                step.FlowInstanceId,
+                                step.StepId,
+                                workerId,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            session.SetResult(step.StepId, result);
         }
         catch (Exception exception)
         {
-            await store
-                .ExecuteAsync(
-                    (storeSession, storeCancellationToken) =>
-                        storeSession.Steps.MarkFailedAsync(
-                            step.FlowInstanceId,
-                            step.StepId,
-                            exception.Message,
-                            timeProvider.GetUtcNow(),
-                            retryAt: null,
-                            storeCancellationToken),
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            await store
-                .ExecuteAsync(
-                    (storeSession, storeCancellationToken) =>
-                        storeSession.Leases.ReleaseStepLeaseAsync(
-                            step.FlowInstanceId,
-                            step.StepId,
-                            workerId,
-                            storeCancellationToken),
-                    CancellationToken.None)
-                .ConfigureAwait(false);
+            try
+            {
+                await store
+                    .ExecuteAsync(
+                        (storeSession, storeCancellationToken) =>
+                            storeSession.Steps.MarkFailedAsync(
+                                step.FlowInstanceId,
+                                step.StepId,
+                                exception.Message,
+                                timeProvider.GetUtcNow(),
+                                retryAt: null,
+                                storeCancellationToken),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                await store
+                    .ExecuteAsync(
+                        (storeSession, storeCancellationToken) =>
+                            storeSession.Leases.ReleaseStepLeaseAsync(
+                                step.FlowInstanceId,
+                                step.StepId,
+                                workerId,
+                                storeCancellationToken),
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
         }
 
         return true;
     }
 
     private async ValueTask<StepInputs> BuildInputsAsync(
+        FlowExecutionSession session,
         Persistence.Steps.StepInstanceRecord step,
         StepExecutionRegistration registration,
         CancellationToken cancellationToken)
@@ -208,8 +231,27 @@ internal sealed class LocalStepExecutor(
             return new StepInputs(values);
         }
 
+        var missingDependencyIds = new List<StepId>();
+
+        for (var i = 0; i < step.Dependencies.Count; i++)
+        {
+            var dependencyId = step.Dependencies[i];
+            if (session.TryGetResult(dependencyId, out var cachedResult))
+            {
+                values[i] = cachedResult;
+                continue;
+            }
+
+            missingDependencyIds.Add(dependencyId);
+        }
+
+        if (missingDependencyIds.Count == 0)
+        {
+            return new StepInputs(values);
+        }
+
         var dependencies = await store.Steps
-            .GetManyAsync(step.FlowInstanceId, step.Dependencies, cancellationToken)
+            .GetManyAsync(step.FlowInstanceId, missingDependencyIds, cancellationToken)
             .ConfigureAwait(false);
         var dependenciesById = dependencies.ToDictionary(
             dependency => dependency.StepId);
@@ -217,6 +259,11 @@ internal sealed class LocalStepExecutor(
         for (var i = 0; i < step.Dependencies.Count; i++)
         {
             var dependencyId = step.Dependencies[i];
+            if (values[i] is not null || session.TryGetResult(dependencyId, out _))
+            {
+                continue;
+            }
+
             if (!dependenciesById.TryGetValue(dependencyId, out var dependency))
             {
                 throw new InvalidOperationException(

@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Spindle.Example.Hosting;
 using Spindle.Hosting;
 using Spindle.Persistence;
@@ -25,6 +26,7 @@ textInbox.Writer.Complete();
 
 var builder = Host.CreateApplicationBuilder(args);
 
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 builder.Services.AddSingleton<ChannelReader<string>>(textInbox.Reader);
 //builder.Services.AddSingleton<ISpindleStore, InMemorySpindleStore>();
 var sqliteConnectionString =
@@ -38,10 +40,10 @@ builder.Services.AddSpindleFlow<TextTransformFlow, TextTransformRequest, TextTra
 
 builder.Services.AddSpindleWorker(options =>
 {
-    options.PollInterval = TimeSpan.FromMilliseconds(100);
+    options.PollInterval = TimeSpan.FromMilliseconds(10);
     options.MaxConcurrentFlowInstances = 4;
     options.MaxFlowInstancesPerTick = 16;
-    options.MaxStepsPerFlowPerTick = 1;
+    options.MaxStepsPerFlowPerTick = 128;
     options.WorkerId = "hosting-example-worker";
 });
 
