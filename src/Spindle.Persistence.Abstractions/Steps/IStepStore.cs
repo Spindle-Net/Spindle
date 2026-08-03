@@ -65,4 +65,18 @@ public interface IStepStore
         DateTimeOffset failedAt,
         DateTimeOffset? retryAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks dependent steps as ready once it's dependencies are completed
+    /// </summary>
+    /// <param name="flowInstanceId">The flow to process</param>
+    /// <param name="updatedSteps">An optional list to limit the processing to these items</param>
+    /// <param name="updatedAt">When the update should be registered</param>
+    /// <param name="cancellationToken">A cancellation token</param>
+    /// <returns></returns>
+    ValueTask MarkDependentsReadyAsync(
+        FlowInstanceId flowInstanceId,
+        List<StepId>? updatedSteps,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default);
 }

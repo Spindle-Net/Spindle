@@ -13,6 +13,7 @@ using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 using Spindle.Testing;
 using Xunit;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using InMemorySpindleStore = Spindle.Persistence.InMemory.InMemorySpindleStore;
 
 namespace Spindle.Runtime.Tests;
@@ -683,6 +684,8 @@ public sealed class RuntimeSpindleRuntimeTests
 
         public int MarkFailedCalls { get; private set; }
 
+        public int MarkDependentsReadyCalls { get; private set; }
+
         public void Reset()
         {
             CreateCalls = 0;
@@ -697,6 +700,7 @@ public sealed class RuntimeSpindleRuntimeTests
             MarkWaitingCalls = 0;
             MarkCompletedCalls = 0;
             MarkFailedCalls = 0;
+            MarkDependentsReadyCalls = 0;
         }
 
         public ValueTask CreateAsync(
@@ -803,6 +807,16 @@ public sealed class RuntimeSpindleRuntimeTests
         {
             MarkFailedCalls++;
             return inner.MarkFailedAsync(flowInstanceId, stepId, error, failedAt, retryAt, cancellationToken);
+        }
+
+        public ValueTask MarkDependentsReadyAsync(
+            FlowInstanceId flowInstanceId, 
+            List<StepId>? updatedSteps, 
+            DateTimeOffset updatedAt, 
+            CancellationToken cancellationToken = default)
+        {
+            MarkDependentsReadyCalls++;
+            return inner.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, cancellationToken);
         }
     }
 

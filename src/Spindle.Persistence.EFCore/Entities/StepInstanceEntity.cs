@@ -27,7 +27,15 @@ internal class StepInstanceEntity
 
     public StepDispatchMode DispatchMode { get; init; }
 
-    public List<string> Dependencies { get; init; } = [];
+    /// <summary>
+    /// The ones the step need in order to continue
+    /// </summary>
+    public List<StepDependencyEntity> Dependencies { get; init; } = [];
+
+    /// <summary>
+    /// Who needs me
+    /// </summary>
+    public List<StepDependencyEntity> Dependents { get; init; } = [];
 
     public SerializedPayload? Input { get; init; }
 

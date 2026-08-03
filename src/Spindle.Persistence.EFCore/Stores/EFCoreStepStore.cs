@@ -19,7 +19,13 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         HandlerId = step.HandlerId?.Value,
         Queue = step.Queue?.Value,
         DispatchMode = step.DispatchMode,
-        Dependencies = step.Dependencies.Select(d => d.Value).ToList(),
+        Dependencies = step.Dependencies.Select(d => new StepDependencyEntity 
+        {
+            FlowInstanceId = step.FlowInstanceId.Value,
+            StepId = step.StepId.Value,
+            DependsOnId = d.Value,
+        }).ToList(),
+        Dependents = [],
         Input = step.Input,
         Result = step.Result,
         Error = step.Error,
@@ -103,7 +109,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         HandlerId = x.HandlerId != null ? new StepHandlerId(x.HandlerId) : null,
         Queue = x.Queue != null ? new QueueName(x.Queue) : null,
         DispatchMode = x.DispatchMode,
-        Dependencies = x.Dependencies.Select(y => new StepId(y)).ToList(),
+        Dependencies = x.Dependencies.Select(y => new StepId(y.StepId)).ToList(),
         Input = x.Input,
         Result = x.Result,
         Error = x.Error,
@@ -142,6 +148,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
         var entities = await context.StepInstances
             .AsNoTracking()
+            .Include(x => x.Dependencies)
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && ids.Contains(x.StepId))
             .ToListAsync(cancellationToken);
 
@@ -323,6 +330,45 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
             , cancellationToken);
 
         await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Failed, failedAt, error, cancellationToken);
+    }
+
+    public async ValueTask MarkDependentsReadyAsync(
+        FlowInstanceId flowInstanceId, 
+        List<StepId>? updatedSteps,
+        DateTimeOffset updatedAt, 
+        CancellationToken cancellationToken = default)
+    {
+        //if (updatedSteps != null)
+        //{
+        //    // Do a limited update using the relationships of those entities
+        //    var updatedStepIds = updatedSteps.Select(x => x.Value).ToList();
+        //    var updated = await context.StepInstances
+        //        .Where(x => x.FlowInstanceId == flowInstanceId.Value)
+
+        //        // Limit the search space with respect to what we tell it has been updated
+        //        .Where(x => updatedStepIds.Contains(x.StepId))
+        //        .SelectMany(x => x.Dependents)
+        //        .Select(x => x.Step!)
+
+        //        .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
+        //        .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
+        //        .ExecuteUpdateAsync(u => u
+        //            .SetProperty(x => x.Status, _ => StepStatus.Ready)
+        //            .SetProperty(x => x.UpdatedAt, _ => updatedAt)
+        //        , cancellationToken);
+        //} 
+        //else
+        //{
+            // Process the entire dependency graph
+            await context.StepInstances
+                .Where(x => x.FlowInstanceId == flowInstanceId.Value)
+                .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
+                .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.Status, _ => StepStatus.Ready)
+                    .SetProperty(x => x.UpdatedAt, _ => updatedAt)
+                , cancellationToken);
+        //}
     }
 
     private async Task CompleteLatestAttempt(

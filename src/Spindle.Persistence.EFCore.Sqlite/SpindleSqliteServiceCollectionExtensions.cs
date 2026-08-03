@@ -16,7 +16,7 @@ public static class SpindleSqliteServiceCollectionExtensions
         return services.AddSpindleEntityFramework(options =>
             options.UseSqlite(
                 connectionString,
-                sqlite => sqlite.MigrationsAssembly(typeof(SpindleSqliteServiceCollectionExtensions).Assembly.FullName)));
+                sqlite => sqlite.MigrationsAssembly(typeof(SpindleSqliteServiceCollectionExtensions).Assembly.FullName)).EnableSensitiveDataLogging());
     }
 
     public static IServiceCollection AddSpindleSqlite(

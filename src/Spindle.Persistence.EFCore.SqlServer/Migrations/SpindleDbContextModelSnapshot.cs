@@ -359,6 +359,24 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.ToTable("StepAttempts", (string)null);
                 });
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
+                {
+                    b.Property<string>("FlowInstanceId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("StepId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("DependsOnId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("FlowInstanceId", "StepId", "DependsOnId");
+
+                    b.HasIndex("FlowInstanceId", "DependsOnId");
+
+                    b.ToTable("StepDependencies");
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
                 {
                     b.Property<string>("FlowInstanceId")
@@ -377,10 +395,6 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
-
-                    b.PrimitiveCollection<string>("Dependencies")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("DispatchMode")
                         .HasColumnType("int");
@@ -573,6 +587,25 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Navigation("Result");
                 });
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
+                {
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
+                        .WithMany("Dependents")
+                        .HasForeignKey("FlowInstanceId", "DependsOnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
+                        .WithMany("Dependencies")
+                        .HasForeignKey("FlowInstanceId", "StepId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DependsOn");
+
+                    b.Navigation("Step");
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
                 {
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Input", b1 =>
@@ -640,6 +673,13 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Navigation("Input");
 
                     b.Navigation("Result");
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
+                {
+                    b.Navigation("Dependencies");
+
+                    b.Navigation("Dependents");
                 });
 #pragma warning restore 612, 618
         }
