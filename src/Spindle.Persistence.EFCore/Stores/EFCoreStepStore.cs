@@ -164,6 +164,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
         var entities = await context.StepInstances
             .AsNoTracking()
+            .Include(x => x.Dependencies)
             .Where(x => x.FlowInstanceId == flowInstanceId.Value)
             .OrderBy(step => step.CreatedAt)
             .ThenBy(x => x.StepId)
@@ -180,6 +181,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
 
         var entities = await context.StepInstances
             .AsNoTracking()
+            .Include(x => x.Dependencies)
             .Where(x => x.Status == StepStatus.Ready)
             .OrderBy(step => step.CreatedAt)
             .ThenBy(x => x.StepId)
