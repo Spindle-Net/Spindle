@@ -13,7 +13,6 @@ using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 using Spindle.Testing;
 using Xunit;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using InMemorySpindleStore = Spindle.Persistence.InMemory.InMemorySpindleStore;
 
 namespace Spindle.Runtime.Tests;
