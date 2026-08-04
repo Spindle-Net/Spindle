@@ -583,13 +583,13 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
                         .WithMany("Dependents")
                         .HasForeignKey("FlowInstanceId", "DependsOnId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
                         .WithMany("Dependencies")
                         .HasForeignKey("FlowInstanceId", "StepId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DependsOn");
