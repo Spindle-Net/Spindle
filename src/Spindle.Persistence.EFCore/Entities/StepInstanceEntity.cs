@@ -28,12 +28,12 @@ internal class StepInstanceEntity
     public StepDispatchMode DispatchMode { get; init; }
 
     /// <summary>
-    /// The ones the step need in order to continue
+    /// Steps that this step depends on (must be completed before this step can run).
     /// </summary>
     public List<StepDependencyEntity> Dependencies { get; init; } = [];
 
     /// <summary>
-    /// Who needs me
+    /// Steps that depend on this step.
     /// </summary>
     public List<StepDependencyEntity> Dependents { get; init; } = [];
 

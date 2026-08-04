@@ -1,7 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
-
 namespace Spindle.Persistence.EFCore.Entities;
 
 [Table("StepDependencies")]
