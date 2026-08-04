@@ -10,6 +10,9 @@
     <Project Path="examples/Spindle.Example.Hosting/Spindle.Example.Hosting.csproj" />
     <Project Path="examples/Spindle.Example.LowLevel/Spindle.Example.LowLevel.csproj" />
   </Folder>
+  <Folder Name="/Benchmarks/">
+    <Project Path="benchmarks/Spindle.Benchmarks/Spindle.Benchmarks.csproj" />
+  </Folder>
   <Folder Name="/Persistence/">
     <Project Path="src/Spindle.Persistence.Abstractions/Spindle.Persistence.Abstractions.csproj" />
     <Project Path="src/Spindle.Persistence.InMemory/Spindle.Persistence.InMemory.csproj" />
