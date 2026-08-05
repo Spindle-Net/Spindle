@@ -14,6 +14,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var existing = await context.Timers.FirstOrDefaultAsync(x => x.FlowInstanceId == timer.FlowInstanceId.Value &&
                                                                      x.StepId == timer.StepId.Value, cancellationToken);
@@ -53,6 +54,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.Timers
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
@@ -67,6 +69,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.Timers
             .Where(timer => timer.FiredAt == null && timer.DueAt <= dueAtOrBefore)
@@ -83,6 +86,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.Timers
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)

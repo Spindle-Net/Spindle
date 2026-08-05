@@ -4,6 +4,8 @@ using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.Steps;
+using Spindle.Runtime;
+using System.Diagnostics;
 
 namespace Spindle;
 
@@ -35,6 +37,9 @@ internal sealed class StepExecutor(
         int maxCount = 100,
         CancellationToken cancellationToken = default)
     {
+        using var mainActivity = Telemetry.ActivitySource.StartActivity($"ExecuteReadySteps - {session.FlowInstanceId.Value}");
+        mainActivity?.SetTag("spindle.worker-id", workerId);
+
         var executed = 0;
         var attempted = new HashSet<StepId>();
         var steps = session
@@ -117,6 +122,7 @@ internal sealed class StepExecutor(
         StepInstanceRecord step,
         CancellationToken cancellationToken)
     {
+        using var activity = Telemetry.ActivitySource.StartActivity($"ExecuteStep - {step.StepId.Value}");
         try
         {
             return (step, await executor

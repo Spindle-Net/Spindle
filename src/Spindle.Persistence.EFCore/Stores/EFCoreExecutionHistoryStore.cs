@@ -12,6 +12,7 @@ internal sealed class EFCoreExecutionHistoryStore(SpindleDbContext context) : IE
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.ExecutionHistories.AddAsync(new Entities.ExecutionHistoryEntity
         {
@@ -29,6 +30,7 @@ internal sealed class EFCoreExecutionHistoryStore(SpindleDbContext context) : IE
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.ExecutionHistories
             .AsNoTracking()

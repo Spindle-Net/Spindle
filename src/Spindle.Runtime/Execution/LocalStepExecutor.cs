@@ -6,6 +6,7 @@ using Spindle.Persistence;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Steps;
 using Spindle.Runtime;
+using System.Diagnostics;
 
 namespace Spindle;
 
@@ -136,6 +137,9 @@ internal sealed class LocalStepExecutor(
             return StepExecutionResult.NotExecuted;
         }
 
+        using var activity = Telemetry.ActivitySource.StartActivity($"{step.Name} - Attempt {step.Attempt}");
+        activity?.SetTag("spindle.worker-id", workerId);
+
         try
         {
             var stepLogger = new StepLogger(session, running, step, logger);
@@ -152,8 +156,12 @@ internal sealed class LocalStepExecutor(
                 .ConfigureAwait(false);
 
             // TODO: Make a difference of immediate and
-            var result = await registration.Execute(inputs, context)
-                .ConfigureAwait(false);
+            object? result;
+            using (var executeActivity = Telemetry.ActivitySource.StartActivity($"ExecuteStepCode - {step.StepId}"))
+            {
+                result = await registration.Execute(inputs, context)
+                    .ConfigureAwait(false);
+            }
 
             await ConcurrencyHelper.AquireLock(step.FlowInstanceId);
             await store
@@ -191,11 +199,13 @@ internal sealed class LocalStepExecutor(
             ConcurrencyHelper.ReleaseLock(step.FlowInstanceId);
 
             session.SetResult(step.StepId, result);
+            activity?.SetStatus(ActivityStatusCode.Ok);
 
             return StepExecutionResult.Succeeded;
         }
         catch (Exception exception)
         {
+            activity?.AddException(exception);
             try
             {
                 await store
@@ -225,6 +235,8 @@ internal sealed class LocalStepExecutor(
                         CancellationToken.None)
                     .ConfigureAwait(false);
             }
+
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
         }
 
         return StepExecutionResult.Failed;

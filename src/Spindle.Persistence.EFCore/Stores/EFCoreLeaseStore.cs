@@ -14,6 +14,11 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+        activity?.SetTag("spindle.efcore.lease.flow-id", lease.FlowInstanceId.Value);
+        activity?.SetTag("spindle.efcore.lease.step-id", lease.StepId.Value);
+        activity?.SetTag("spindle.efcore.lease.owner", lease.Owner);
+
         var updated = await context.StepLeases
             .Where(existing =>
                 existing.FlowInstanceId == lease.FlowInstanceId.Value &&
@@ -60,6 +65,11 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+        activity?.SetTag("spindle.efcore.lease.flow-id", flowInstanceId.Value);
+        activity?.SetTag("spindle.efcore.lease.step-id", stepId.Value);
+        activity?.SetTag("spindle.efcore.lease.owner", owner);
 
         await context.StepLeases.
             Where(x => x.FlowInstanceId == flowInstanceId.Value &&

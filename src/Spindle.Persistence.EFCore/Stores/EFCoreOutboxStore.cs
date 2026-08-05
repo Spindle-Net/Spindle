@@ -13,6 +13,7 @@ internal sealed class EFCoreOutboxStore(SpindleDbContext context) : IOutboxStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.OutboxMessages.AddAsync(new OutboxMessageEntity
         {
@@ -41,6 +42,7 @@ internal sealed class EFCoreOutboxStore(SpindleDbContext context) : IOutboxStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.OutboxMessages
             .AsNoTracking()
@@ -57,6 +59,7 @@ internal sealed class EFCoreOutboxStore(SpindleDbContext context) : IOutboxStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.OutboxMessages
             .Where(x => x.MessageId == messageId)

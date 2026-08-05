@@ -14,6 +14,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var existing = await context.FlowDefinitions.FirstOrDefaultAsync(x =>
             x.FlowName == definition.FlowName.Value && x.FlowVersion == definition.FlowVersion.Value,
@@ -50,6 +51,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.FlowDefinitions
             .AsNoTracking()
@@ -63,6 +65,7 @@ internal sealed class EFCoreFlowDefinitionStore(SpindleDbContext context) : IFlo
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.FlowDefinitions
             .AsNoTracking()

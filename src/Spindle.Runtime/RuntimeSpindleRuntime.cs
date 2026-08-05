@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Exceptions;
@@ -7,6 +8,7 @@ using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
 using Spindle.Persistence.Steps;
+using Spindle.Runtime;
 
 namespace Spindle;
 
@@ -415,6 +417,9 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         int maxSteps,
         CancellationToken cancellationToken)
     {
+        using var activity = Telemetry.ActivitySource.StartActivity();
+        activity?.SetTag("spindle.instance-id", instanceId.Value);
+        activity?.SetTag("spindle.worker-id", _options.WorkerId);
         var before = await _store.FlowInstances
             .GetAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);

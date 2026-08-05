@@ -12,6 +12,7 @@ internal sealed class EFCoreInboxStore(SpindleDbContext context) : IInboxStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.InboxMessages.AddAsync(new InboxMessageEntity
         {
@@ -31,6 +32,7 @@ internal sealed class EFCoreInboxStore(SpindleDbContext context) : IInboxStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.InboxMessages
             .AsNoTracking()

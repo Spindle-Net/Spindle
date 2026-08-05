@@ -13,6 +13,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.SignalWaits.AddAsync(new SignalWaitEntity
         {
@@ -33,6 +34,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.SignalWaits
             .Where(wait =>
@@ -60,6 +62,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.SignalWaits
             .Where(x => x.FlowInstanceId == flowInstanceId.Value &&
@@ -74,6 +77,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.Signals.AddAsync(new EFCore.Entities.SignalEntity
         {
@@ -88,6 +92,8 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
 
     public async Task<IReadOnlyList<SignalRecord>> GetSignals()
     {
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
         return await context.Signals
             .AsNoTracking()
             .Select(x => new SignalRecord
