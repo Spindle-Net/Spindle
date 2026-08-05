@@ -24,7 +24,7 @@ public sealed class TextConsumerService(
 
         await foreach (var text in textInbox.ReadAllAsync(stoppingToken))
         {
-            var handle = await runtime.StartAsync<TextTransformRequest, TextTransformResult>(
+            var handle = await runtime.EnqueueAsync<TextTransformRequest, TextTransformResult>(
                     TextTransformFlow.Name,
                     new TextTransformRequest(text),
                     new StartFlowOptions { IdempotencyKey = $"hosting-example-{index++}" },
