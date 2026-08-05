@@ -4,6 +4,8 @@ namespace Spindle.Persistence.EFCore.Entities;
 
 [Table("StepDependencies")]
 [PrimaryKey(nameof(FlowInstanceId), nameof(StepId), nameof(DependsOnId))]
+[Index(nameof(FlowInstanceId), nameof(StepId))]
+[Index(nameof(FlowInstanceId), nameof(DependsOnId))]
 internal class StepDependencyEntity
 {
 

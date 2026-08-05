@@ -9,7 +9,7 @@ namespace Spindle.Abstractions.Flows;
 public interface ISpindleRuntime
 {
     /// <summary>
-    /// Triggers the start of a flow
+    /// Schedules a task to run on a Spindle Worker instance.
     /// </summary>
     /// <param name="flowName">The name of the flow</param>
     /// <param name="request">The flow input/request</param>
@@ -17,13 +17,59 @@ public interface ISpindleRuntime
     /// <param name="cancellationToken">A cancellation token for queueing the flow</param>
     /// <typeparam name="TRequest">The type of the flow input data</typeparam>
     /// <typeparam name="TResult">The type that the flow responds with</typeparam>
-    /// <returns>The flow handleSo</returns>
+    /// <returns>The flow handle</returns>
+    ValueTask<FlowInstanceHandle<TResult>> EnqueueAsync<TRequest, TResult>(
+        FlowName flowName,
+        TRequest request,
+        StartFlowOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Schedules a task to run in the current runtime instance, will start immediately if possible. 
+    /// </summary>
+    /// <param name="flowName">The name of the flow</param>
+    /// <param name="request">The flow input/request</param>
+    /// <param name="options">Flow options</param>
+    /// <param name="cancellationToken">A cancellation token for queueing the flow</param>
+    /// <typeparam name="TRequest">The type of the flow input data</typeparam>
+    /// <typeparam name="TResult">The type that the flow responds with</typeparam>
+    /// <returns>The flow handle</returns>
     ValueTask<FlowInstanceHandle<TResult>> StartAsync<TRequest, TResult>(
         FlowName flowName,
         TRequest request,
         StartFlowOptions? options = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Schedules a task to run on a Spindle Worker instance.
+    /// </summary>
+    /// <param name="flowName">The name of the flow</param>
+    /// <param name="flowVersion">The version of the flow</param>
+    /// <param name="request">The flow input/request</param>
+    /// <param name="options">Flow options</param>
+    /// <param name="cancellationToken">A cancellation token for queueing the flow</param>
+    /// <typeparam name="TRequest">The type of the flow input data</typeparam>
+    /// <typeparam name="TResult">The type that the flow responds with</typeparam>
+    /// <returns>The flow handle</returns>
+    ValueTask<FlowInstanceHandle<TResult>> EnqueueAsync<TRequest, TResult>(
+        FlowName flowName,
+        FlowVersion flowVersion,
+        TRequest request,
+        StartFlowOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Schedules a task to run in the current runtime instance, will start immediately if possible.
+    /// </summary>
+    /// <param name="flowName">The name of the flow</param>
+    /// <param name="flowVersion">The version of the flow</param>
+    /// <param name="request">The flow input/request</param>
+    /// <param name="options">Flow options</param>
+    /// <param name="cancellationToken">A cancellation token for queueing the flow</param>
+    /// <typeparam name="TRequest">The type of the flow input data</typeparam>
+    /// <typeparam name="TResult">The type that the flow responds with</typeparam>
+    /// <returns>The flow handle</returns>
+    /// <returns></returns>
     ValueTask<FlowInstanceHandle<TResult>> StartAsync<TRequest, TResult>(
         FlowName flowName,
         FlowVersion flowVersion,

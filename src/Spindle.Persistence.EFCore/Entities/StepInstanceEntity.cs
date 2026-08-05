@@ -7,6 +7,7 @@ namespace Spindle.Persistence.EFCore.Entities;
 
 [PrimaryKey(nameof(FlowInstanceId), nameof(StepId))]
 [Index(nameof(Status), nameof(CreatedAt))]
+[Index(nameof(FlowInstanceId), nameof(StepId), nameof(Status))]
 internal class StepInstanceEntity
 {
     [MaxLength(255)]

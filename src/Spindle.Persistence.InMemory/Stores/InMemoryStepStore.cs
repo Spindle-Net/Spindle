@@ -230,6 +230,7 @@ public sealed class InMemoryStepStore : IStepStore
     public ValueTask MarkCompletedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         SerializedPayload? result,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default)
@@ -248,7 +249,7 @@ public sealed class InMemoryStepStore : IStepStore
                 UpdatedAt = completedAt
             };
 
-            CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Completed, completedAt, null);
+            CompleteLatestAttempt(flowInstanceId, stepId, attempt, StepStatus.Completed, completedAt, null);
         }
 
         return ValueTask.CompletedTask;
@@ -257,6 +258,7 @@ public sealed class InMemoryStepStore : IStepStore
     public ValueTask MarkFailedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         string error,
         DateTimeOffset failedAt,
         DateTimeOffset? retryAt,
@@ -276,7 +278,7 @@ public sealed class InMemoryStepStore : IStepStore
                 UpdatedAt = failedAt
             };
 
-            CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Failed, failedAt, error);
+            CompleteLatestAttempt(flowInstanceId, stepId, attempt, StepStatus.Failed, failedAt, error);
         }
 
         return ValueTask.CompletedTask;
@@ -336,6 +338,7 @@ public sealed class InMemoryStepStore : IStepStore
     private void CompleteLatestAttempt(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attemptIx,
         StepStatus status,
         DateTimeOffset completedAt,
         string? error)
@@ -343,7 +346,8 @@ public sealed class InMemoryStepStore : IStepStore
         var attemptIndex = _attempts.FindLastIndex(attempt =>
             attempt.FlowInstanceId == flowInstanceId &&
             attempt.StepId == stepId &&
-            attempt.CompletedAt is null);
+            attempt.CompletedAt is null &&
+            attempt.Attempt == attemptIx);
 
         if (attemptIndex < 0)
         {

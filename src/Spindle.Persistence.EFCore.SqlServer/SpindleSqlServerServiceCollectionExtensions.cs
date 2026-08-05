@@ -13,8 +13,18 @@ public static class SpindleSqlServerServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         return services.AddSpindleEntityFramework(options =>
+        {
             options.UseSqlServer(
                 connectionString,
-                sqlServer => sqlServer.MigrationsAssembly(typeof(SpindleSqlServerServiceCollectionExtensions).Assembly.FullName)));
+                sqlServer => sqlServer
+                    .MigrationsAssembly(typeof(SpindleSqlServerServiceCollectionExtensions).Assembly.FullName)
+                    .EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromMilliseconds(100),
+                        errorNumbersToAdd: null
+                    ));
+            options.EnableDetailedErrors()
+                .EnableSensitiveDataLogging();
+        });
     }
 }

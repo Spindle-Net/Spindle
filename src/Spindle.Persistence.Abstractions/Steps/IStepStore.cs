@@ -54,6 +54,7 @@ public interface IStepStore
     ValueTask MarkCompletedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         SerializedPayload? result,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default);
@@ -61,6 +62,7 @@ public interface IStepStore
     ValueTask MarkFailedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         string error,
         DateTimeOffset failedAt,
         DateTimeOffset? retryAt,

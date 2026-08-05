@@ -374,6 +374,8 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                     b.HasIndex("FlowInstanceId", "DependsOnId");
 
+                    b.HasIndex("FlowInstanceId", "StepId");
+
                     b.ToTable("StepDependencies");
                 });
 
@@ -430,6 +432,8 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.HasKey("FlowInstanceId", "StepId");
 
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("FlowInstanceId", "StepId", "Status");
 
                     b.ToTable("StepInstances", (string)null);
                 });
@@ -592,13 +596,13 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
                         .WithMany("Dependents")
                         .HasForeignKey("FlowInstanceId", "DependsOnId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
                         .WithMany("Dependencies")
                         .HasForeignKey("FlowInstanceId", "StepId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DependsOn");

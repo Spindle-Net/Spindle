@@ -6,7 +6,7 @@ using MySql.EntityFrameworkCore.Metadata;
 namespace Spindle.Persistence.EFCore.MySql.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Initial_Migration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -189,7 +189,6 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     HandlerId = table.Column<string>(type: "longtext", nullable: true),
                     Queue = table.Column<string>(type: "longtext", nullable: true),
                     DispatchMode = table.Column<int>(type: "int", nullable: false),
-                    Dependencies = table.Column<string>(type: "json", nullable: false),
                     Input_ContentType = table.Column<string>(type: "longtext", nullable: true),
                     Input_TypeName = table.Column<string>(type: "longtext", nullable: true),
                     Input_Data = table.Column<byte[]>(type: "longblob", nullable: true),
@@ -242,6 +241,32 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 })
                 .Annotation("MySQL:Charset", "utf8mb4");
 
+            migrationBuilder.CreateTable(
+                name: "StepDependencies",
+                columns: table => new
+                {
+                    FlowInstanceId = table.Column<string>(type: "varchar(255)", nullable: false),
+                    StepId = table.Column<string>(type: "varchar(255)", nullable: false),
+                    DependsOnId = table.Column<string>(type: "varchar(255)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StepDependencies", x => new { x.FlowInstanceId, x.StepId, x.DependsOnId });
+                    table.ForeignKey(
+                        name: "FK_StepDependencies_StepInstances_FlowInstanceId_DependsOnId",
+                        columns: x => new { x.FlowInstanceId, x.DependsOnId },
+                        principalTable: "StepInstances",
+                        principalColumns: new[] { "FlowInstanceId", "StepId" },
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_StepDependencies_StepInstances_FlowInstanceId_StepId",
+                        columns: x => new { x.FlowInstanceId, x.StepId },
+                        principalTable: "StepInstances",
+                        principalColumns: new[] { "FlowInstanceId", "StepId" },
+                        onDelete: ReferentialAction.Restrict);
+                })
+                .Annotation("MySQL:Charset", "utf8mb4");
+
             migrationBuilder.CreateIndex(
                 name: "IX_FlowInstances_FlowName_IdempotencyKey",
                 table: "FlowInstances",
@@ -262,6 +287,11 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 name: "IX_SignalWaits_SignalName_CorrelationKey_CompletedAt",
                 table: "SignalWaits",
                 columns: new[] { "SignalName", "CorrelationKey", "CompletedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StepDependencies_FlowInstanceId_DependsOnId",
+                table: "StepDependencies",
+                columns: new[] { "FlowInstanceId", "DependsOnId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StepInstances_Status_CreatedAt",
@@ -302,13 +332,16 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 name: "StepAttempts");
 
             migrationBuilder.DropTable(
-                name: "StepInstances");
+                name: "StepDependencies");
 
             migrationBuilder.DropTable(
                 name: "StepLeases");
 
             migrationBuilder.DropTable(
                 name: "Timers");
+
+            migrationBuilder.DropTable(
+                name: "StepInstances");
         }
     }
 }

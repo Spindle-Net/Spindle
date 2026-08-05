@@ -5,6 +5,7 @@ using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Steps;
+using Spindle.Runtime;
 
 namespace Spindle;
 
@@ -41,6 +42,7 @@ internal sealed class LocalStepExecutor(
                         storeSession.Steps.MarkFailedAsync(
                             step.FlowInstanceId,
                             step.StepId,
+                            step.Attempt,
                             "Queued step dispatch is not supported yet.",
                             timeProvider.GetUtcNow(),
                             retryAt: null,
@@ -59,6 +61,7 @@ internal sealed class LocalStepExecutor(
                         storeSession.Steps.MarkFailedAsync(
                             step.FlowInstanceId,
                             step.StepId,
+                            step.Attempt,
                             $"Step dispatch mode '{step.DispatchMode}' is not supported by the local runtime.",
                             timeProvider.GetUtcNow(),
                             retryAt: null,
@@ -152,6 +155,7 @@ internal sealed class LocalStepExecutor(
             var result = await registration.Execute(inputs, context)
                 .ConfigureAwait(false);
 
+            await ConcurrencyHelper.AquireLock(step.FlowInstanceId);
             await store
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
@@ -160,6 +164,7 @@ internal sealed class LocalStepExecutor(
                             .MarkCompletedAsync(
                                 step.FlowInstanceId,
                                 step.StepId,
+                                step.Attempt,
                                 SerializerReflection.Serialize(serializer, result, registration.ResultType),
                                 timeProvider.GetUtcNow(),
                                 storeCancellationToken)
@@ -183,6 +188,7 @@ internal sealed class LocalStepExecutor(
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
+            ConcurrencyHelper.ReleaseLock(step.FlowInstanceId);
 
             session.SetResult(step.StepId, result);
 
@@ -198,6 +204,7 @@ internal sealed class LocalStepExecutor(
                             storeSession.Steps.MarkFailedAsync(
                                 step.FlowInstanceId,
                                 step.StepId,
+                                step.Attempt,
                                 exception.Message,
                                 timeProvider.GetUtcNow(),
                                 retryAt: null,

@@ -102,11 +102,11 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
         public ValueTask MarkWaitingAsync(FlowInstanceId flowInstanceId, StepId stepId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Steps.MarkWaitingAsync(flowInstanceId, stepId, updatedAt, token), cancellationToken);
 
-        public ValueTask MarkCompletedAsync(FlowInstanceId flowInstanceId, StepId stepId, SerializedPayload? result, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkCompletedAsync(flowInstanceId, stepId, result, completedAt, token), cancellationToken);
+        public ValueTask MarkCompletedAsync(FlowInstanceId flowInstanceId, StepId stepId, int attempt, SerializedPayload? result, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Steps.MarkCompletedAsync(flowInstanceId, stepId, attempt, result, completedAt, token), cancellationToken);
 
-        public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, StepId stepId, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkFailedAsync(flowInstanceId, stepId, error, failedAt, retryAt, token), cancellationToken);
+        public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, StepId stepId, int attempt, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Steps.MarkFailedAsync(flowInstanceId, stepId, attempt, error, failedAt, retryAt, token), cancellationToken);
 
         public ValueTask MarkDependentsReadyAsync(FlowInstanceId flowInstanceId, List<StepId>? updatedSteps, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Steps.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, token), cancellationToken);

@@ -50,17 +50,21 @@ public sealed class EFCoreSpindleStore : ISpindleStore
         await using var context = await _contextFactory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
-        await using var transaction = await context.Database
+        var strategy = context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await context.Database
             .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
-        var session = new ContextStoreSession(context);
+            var session = new ContextStoreSession(context);
 
-        var result = await operation(session, cancellationToken)
-            .ConfigureAwait(false);
+            var result = await operation(session, cancellationToken)
+                .ConfigureAwait(false);
 
-        await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-        return result;
+            await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return result;
+        });
     }
 
     internal async ValueTask ExecuteDirectAsync(

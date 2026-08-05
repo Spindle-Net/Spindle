@@ -11,8 +11,8 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.Sqlite.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    [Migration("20260803140837_Replace_Step_Dependencies_With_Tables")]
-    partial class Replace_Step_Dependencies_With_Tables
+    [Migration("20260804134202_Initial_Migration")]
+    partial class Initial_Migration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -584,13 +584,13 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
                         .WithMany("Dependents")
                         .HasForeignKey("FlowInstanceId", "DependsOnId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
                         .WithMany("Dependencies")
                         .HasForeignKey("FlowInstanceId", "StepId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DependsOn");

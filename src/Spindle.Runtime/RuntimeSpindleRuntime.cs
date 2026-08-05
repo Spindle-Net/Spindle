@@ -73,6 +73,21 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         return this;
     }
 
+    public ValueTask<FlowInstanceHandle<TResult>> EnqueueAsync<TRequest, TResult>(
+        FlowName flowName,
+        TRequest request,
+        StartFlowOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var version = options?.Version;
+        return EnqueueAsync<TRequest, TResult>(
+            flowName,
+            version ?? _registry.Resolve(flowName).FlowVersion,
+            request,
+            options,
+            cancellationToken);
+    }
+
     public ValueTask<FlowInstanceHandle<TResult>> StartAsync<TRequest, TResult>(
         FlowName flowName,
         TRequest request,
@@ -88,7 +103,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             cancellationToken);
     }
 
-    public async ValueTask<FlowInstanceHandle<TResult>> StartAsync<TRequest, TResult>(
+    private async ValueTask<(FlowInstanceHandle<TResult> handle, bool created)> InternalQueueAsync<TRequest, TResult>(
         FlowName flowName,
         FlowVersion flowVersion,
         TRequest request,
@@ -165,8 +180,33 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                 cancellationToken)
             .ConfigureAwait(false);
 
+        return (handle, created);
+    }
+
+    public async ValueTask<FlowInstanceHandle<TResult>> EnqueueAsync<TRequest, TResult>(
+        FlowName flowName,
+        FlowVersion flowVersion,
+        TRequest request,
+        StartFlowOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (handle, _) = await InternalQueueAsync<TRequest, TResult>(flowName, flowVersion, request, options, cancellationToken);
+        
+        return handle;
+    }
+
+    public async ValueTask<FlowInstanceHandle<TResult>> StartAsync<TRequest, TResult>(
+        FlowName flowName,
+        FlowVersion flowVersion,
+        TRequest request,
+        StartFlowOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var (handle, created) = await InternalQueueAsync<TRequest, TResult>(flowName, flowVersion, request, options, cancellationToken);
+
         if (created)
         {
+            var instanceId = handle.InstanceId;
             await ExecuteWithInstanceGateAsync(
                     instanceId,
                     async gateCancellationToken =>
@@ -295,7 +335,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                         }
 
                         await storeSession.Steps
-                            .MarkCompletedAsync(timer.FlowInstanceId, timer.StepId, result: null, now, storeCancellationToken)
+                            .MarkCompletedAsync(timer.FlowInstanceId, timer.StepId, -1, result: null, now, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.Timers

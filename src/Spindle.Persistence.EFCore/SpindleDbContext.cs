@@ -123,11 +123,13 @@ public sealed class SpindleDbContext(
         {
             entity.HasOne(x => x.Step)
                 .WithMany(x => x.Dependencies)
-                .HasForeignKey(x => new { x.FlowInstanceId, x.StepId });
+                .HasForeignKey(x => new { x.FlowInstanceId, x.StepId })
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.DependsOn)
                 .WithMany(x => x.Dependents)
-                .HasForeignKey(x => new { x.FlowInstanceId, x.DependsOnId });
+                .HasForeignKey(x => new { x.FlowInstanceId, x.DependsOnId })
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<StepInstanceEntity>(entity =>
