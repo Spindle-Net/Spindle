@@ -820,15 +820,6 @@ public sealed class RuntimeSpindleRuntimeTests
             return inner.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, cancellationToken);
         }
 
-        public ValueTask MarkDependentsReadyAsync(
-            FlowInstanceId flowInstanceId, 
-            List<StepId>? updatedSteps, 
-            DateTimeOffset updatedAt, 
-            CancellationToken cancellationToken = default)
-        {
-            MarkDependentsReadyCalls++;
-            return inner.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, cancellationToken);
-        }
     }
 
 }
