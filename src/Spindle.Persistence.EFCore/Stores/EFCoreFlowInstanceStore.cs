@@ -14,6 +14,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var existing = await context.FlowInstances.FirstOrDefaultAsync(x =>
             (x.InstanceId == instance.InstanceId.Value) || // Either the instance itself exists already OR
@@ -75,6 +76,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.FlowInstances
             .AsNoTracking()
@@ -89,6 +91,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.FlowInstances
             .AsNoTracking()
@@ -104,6 +107,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.FlowInstances
             .AsNoTracking()
@@ -127,6 +131,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.FlowInstances
             .Where(x => x.InstanceId == instanceId.Value)
@@ -144,6 +149,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var instance = await context.FlowInstances
             .FirstOrDefaultAsync(
@@ -171,6 +177,7 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.FlowInstances
             .Where(x => x.InstanceId == instanceId.Value)

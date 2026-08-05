@@ -46,6 +46,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(operation);
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity("EFCoreSpindleStore.ExecuteAsync");
 
         await using var context = await _contextFactory
             .CreateDbContextAsync(cancellationToken)
@@ -54,8 +55,8 @@ public sealed class EFCoreSpindleStore : ISpindleStore
         return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+                .BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
             var session = new ContextStoreSession(context);
 
             var result = await operation(session, cancellationToken)

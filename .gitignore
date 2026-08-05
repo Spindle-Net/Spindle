@@ -481,3 +481,5 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+examples/Spindle.Example.Observability/Properties/launchSettings.json
+Spindle.Net.lutconfig

@@ -3,6 +3,7 @@ using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.EFCore.Entities;
 using Spindle.Persistence.Steps;
+using System.Diagnostics;
 
 namespace Spindle.Persistence.EFCore.Stores;
 
@@ -42,6 +43,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var alreadyExists = await context.StepInstances.AnyAsync(x => x.FlowInstanceId == step.FlowInstanceId.Value &&
                                                                       x.StepId == step.StepId.Value, cancellationToken);
@@ -61,6 +63,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(steps);
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var groupedSteps = steps.GroupBy(x => x.FlowInstanceId).Select(x => new
         {
@@ -127,6 +130,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var entity = await context.StepInstances
             .AsNoTracking()
@@ -144,6 +148,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(stepIds);
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var ids = stepIds.Select(x => x.Value).Distinct().ToList();
 
@@ -161,6 +166,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var entities = await context.StepInstances
             .AsNoTracking()
@@ -178,6 +184,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var entities = await context.StepInstances
             .AsNoTracking()
@@ -198,6 +205,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var currentStatus = await context.StepInstances
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
@@ -227,6 +235,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var prevAttempt = await context.StepInstances
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
@@ -264,6 +273,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var exists = await context.StepInstances
             .AnyAsync(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value, cancellationToken);
@@ -288,6 +298,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var step = await context.StepInstances
             .FirstOrDefaultAsync(
@@ -317,6 +328,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var exists = await context.StepInstances
             .AnyAsync(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value, cancellationToken);
@@ -343,6 +355,9 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         DateTimeOffset updatedAt, 
         CancellationToken cancellationToken = default)
     {
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+        activity?.SetTag("spindle.efcore.updated-steps", updatedSteps?.Count ?? 0);
+
         if (updatedSteps is { Count: > 0 })
         {
             var updatedStepIds = updatedSteps.Select(x => x.Value).ToList();
@@ -382,6 +397,8 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         string? error,
         CancellationToken cancellationToken = default)
     {
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
         await context.StepAttempts
             // Find the last one
             .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value && !x.CompletedAt.HasValue && x.Attempt == attempt)
