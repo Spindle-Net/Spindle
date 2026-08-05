@@ -33,6 +33,7 @@ builder.Services.AddOpenTelemetry()
         });
         tracing.AddSource(Spindle.Runtime.Telemetry.ActivitySourceName);
         tracing.AddSource(SpindleEFCoreTelemetry.ActivitySourceName);
+        tracing.AddSource(SpindleHostingTelemetry.ActivitySourceName);
         tracing.AddSource(activitySource.Name);
         tracing.AddOtlpExporter(c =>
         {
@@ -41,12 +42,13 @@ builder.Services.AddOpenTelemetry()
         });
     });
 //builder.Services.AddSingleton<ISpindleStore, InMemorySpindleStore>();
-var sqliteConnectionString =
-    "Data Source=SpindleHostingExample;Mode=Memory;Cache=Shared";
-await using var sqliteDatabaseAnchor = new SqliteConnection(sqliteConnectionString);
-await sqliteDatabaseAnchor.OpenAsync();
-builder.Services.AddSpindleSqlite(sqliteConnectionString);
+//var sqliteConnectionString =
+//    "Data Source=SpindleHostingExample;Mode=Memory;Cache=Shared";
+//await using var sqliteDatabaseAnchor = new SqliteConnection(sqliteConnectionString);
+//await sqliteDatabaseAnchor.OpenAsync();
+//builder.Services.AddSpindleSqlite(sqliteConnectionString);
 
+builder.Services.AddSpindleSqlServer("Data Source=.;Initial Catalog=Spindle;Trusted_Connection=True;Encrypt=False");
 builder.Services.AddSpindleFlow<UnitDummyFlow, Unit, Unit>(UnitDummyFlow.Name);
 builder.Services.AddSpindleRuntime();
 builder.Services.AddSpindleWorker(options =>

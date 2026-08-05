@@ -2,6 +2,7 @@ using Spindle.Abstractions.Core;
 using Spindle.Persistence;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
+using Spindle.Runtime;
 
 namespace Spindle.Hosting;
 
@@ -122,7 +123,7 @@ public sealed class SpindleRuntimePump(
         FlowInstanceId instanceId,
         CancellationToken cancellationToken)
     {
-        using var activity = Telemetry.ActivitySource.StartActivity();
+        using var activity = SpindleHostingTelemetry.ActivitySource.StartActivity();
         activity?.SetTag("spindle.worker-id", options.Value.WorkerId);
         activity?.SetTag("spindle.flow-id", instanceId.Value);
 
