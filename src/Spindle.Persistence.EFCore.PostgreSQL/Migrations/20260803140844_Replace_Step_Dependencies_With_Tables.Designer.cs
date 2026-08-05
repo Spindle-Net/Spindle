@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Spindle.Persistence.EFCore;
@@ -12,9 +13,11 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260803140844_Replace_Step_Dependencies_With_Tables")]
+    partial class Replace_Step_Dependencies_With_Tables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -373,8 +376,6 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
 
                     b.HasIndex("FlowInstanceId", "DependsOnId");
 
-                    b.HasIndex("FlowInstanceId", "StepId");
-
                     b.ToTable("StepDependencies");
                 });
 
@@ -431,8 +432,6 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     b.HasKey("FlowInstanceId", "StepId");
 
                     b.HasIndex("Status", "CreatedAt");
-
-                    b.HasIndex("FlowInstanceId", "StepId", "Status");
 
                     b.ToTable("StepInstances", (string)null);
                 });
@@ -595,14 +594,17 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
                         .WithMany("Dependents")
                         .HasForeignKey("FlowInstanceId", "DependsOnId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
                         .WithMany("Dependencies")
                         .HasForeignKey("FlowInstanceId", "StepId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("DependsOn");
+
                     b.Navigation("Step");
                 });
 
