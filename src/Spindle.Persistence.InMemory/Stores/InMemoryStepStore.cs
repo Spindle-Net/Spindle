@@ -282,6 +282,49 @@ public sealed class InMemoryStepStore : IStepStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask MarkDependentsReadyAsync(
+        FlowInstanceId flowInstanceId,
+        List<StepId>? updatedSteps,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var steps = _steps.Values
+                .Where(step => step.FlowInstanceId == flowInstanceId)
+                .OrderBy(step => step.CreatedAt)
+                .ThenBy(step => step.StepId.Value, StringComparer.Ordinal)
+                .ToArray();
+
+            var completed = steps
+                .Where(step => step.Status == StepStatus.Completed)
+                .Select(step => step.StepId)
+                .ToHashSet();
+
+            foreach (var step in steps)
+            {
+                if (step.Status is not (StepStatus.Pending or StepStatus.Waiting))
+                {
+                    continue;
+                }
+
+                if (step.Dependencies.Count == 0 ||
+                    step.Dependencies.All(completed.Contains))
+                {
+                    _steps[(flowInstanceId, step.StepId)] = step with
+                    {
+                        Status = StepStatus.Ready,
+                        UpdatedAt = updatedAt
+                    };
+                }
+            }
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     private StepInstanceRecord GetRequired(FlowInstanceId flowInstanceId, StepId stepId)
     {
         return _steps.TryGetValue((flowInstanceId, stepId), out var step)

@@ -19,7 +19,6 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
     private readonly TimeProvider _timeProvider;
     private readonly StepHandlerRegistry _stepHandlers;
     private readonly IServiceProvider _services;
-    private readonly StepScheduler _scheduler;
     private readonly FlowExecutor _flowExecutor;
     private readonly StepExecutor _stepExecutor;
     private readonly ConcurrentDictionary<FlowInstanceId, SemaphoreSlim> _instanceGates = new();
@@ -39,7 +38,6 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             ?? _services.GetService(typeof(StepHandlerRegistry)) as StepHandlerRegistry
             ?? new StepHandlerRegistry();
 
-        _scheduler = new StepScheduler(_timeProvider);
         _flowExecutor = new FlowExecutor(
             _store,
             _registry,
@@ -49,7 +47,6 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             _services);
         _stepExecutor = new StepExecutor(
             _store,
-            _scheduler,
             _serializer,
             _timeProvider,
             _options.StepLeaseDuration,
@@ -305,8 +302,8 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             .MarkFiredAsync(timer.FlowInstanceId, timer.StepId, now, storeCancellationToken)
                             .ConfigureAwait(false);
 
-                        await _scheduler
-                            .MarkDependentsReadyAsync(storeSession, timer.FlowInstanceId, storeCancellationToken)
+                        await storeSession.Steps
+                            .MarkDependentsReadyAsync(timer.FlowInstanceId, [timer.StepId], _timeProvider.GetUtcNow(), storeCancellationToken)
                             .ConfigureAwait(false);
 
                         fired++;

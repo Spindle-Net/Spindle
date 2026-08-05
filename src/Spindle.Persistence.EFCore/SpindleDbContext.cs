@@ -119,16 +119,20 @@ public sealed class SpindleDbContext(
         modelBuilder.Entity<StepAttemptEntity>(entity =>
             entity.ToTable("StepAttempts"));
 
+        modelBuilder.Entity<StepDependencyEntity>(entity =>
+        {
+            entity.HasOne(x => x.Step)
+                .WithMany(x => x.Dependencies)
+                .HasForeignKey(x => new { x.FlowInstanceId, x.StepId });
+
+            entity.HasOne(x => x.DependsOn)
+                .WithMany(x => x.Dependents)
+                .HasForeignKey(x => new { x.FlowInstanceId, x.DependsOnId });
+        });
+
         modelBuilder.Entity<StepInstanceEntity>(entity =>
         {
             entity.ToTable("StepInstances");
-
-            if (Database.ProviderName == "MySql.EntityFrameworkCore")
-            {
-                entity
-                    .Property(owner => owner.Dependencies)
-                    .HasColumnType("json");
-            }
 
             entity.OwnsOne(
                 owner => owner.Input,

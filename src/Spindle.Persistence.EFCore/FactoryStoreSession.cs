@@ -107,6 +107,9 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
         public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, StepId stepId, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Steps.MarkFailedAsync(flowInstanceId, stepId, error, failedAt, retryAt, token), cancellationToken);
+
+        public ValueTask MarkDependentsReadyAsync(FlowInstanceId flowInstanceId, List<StepId>? updatedSteps, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Steps.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, token), cancellationToken);
     }
 
     private sealed class TimerStore(EFCoreSpindleStore store) : ITimerStore

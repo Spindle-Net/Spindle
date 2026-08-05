@@ -21,6 +21,55 @@ namespace Spindle.Persistence.EFCore.Tests;
 public sealed class EntityFrameworkPersistenceTests
 {
     [Fact]
+    public async Task MarkDependentsReadyAsync_UpdatesOnlyDependentsOfChangedSteps()
+    {
+        var connectionString = $"Data Source=SpindleDependencyTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        await using var databaseAnchor = new SqliteConnection(connectionString);
+        await databaseAnchor.OpenAsync();
+
+        var services = new ServiceCollection();
+        services.AddSpindleSqlite(connectionString);
+        await using var provider = services.BuildServiceProvider();
+        var database = provider.GetRequiredService<SpindleDbContext>();
+        await database.Database.MigrateAsync();
+
+        var store = provider.GetRequiredService<ISpindleStore>();
+        var now = DateTimeOffset.Parse("2026-08-03T12:00:00Z");
+        var flowInstanceId = new FlowInstanceId("dependency-instance");
+        var completedStepId = new StepId("completed");
+        var incompleteStepId = new StepId("incomplete");
+        var dependentStepId = new StepId("dependent");
+        var unrelatedStepId = new StepId("unrelated");
+
+        await store.Steps.CreateManyAsync(
+        [
+            CreateStep(completedStepId, StepStatus.Completed, []),
+            CreateStep(incompleteStepId, StepStatus.Pending, []),
+            CreateStep(dependentStepId, StepStatus.Pending, [completedStepId]),
+            CreateStep(unrelatedStepId, StepStatus.Pending, [incompleteStepId]),
+        ]);
+
+        await store.Steps.MarkDependentsReadyAsync(flowInstanceId, [completedStepId], now.AddMinutes(1));
+
+        Assert.Equal(StepStatus.Ready, (await store.Steps.GetAsync(flowInstanceId, dependentStepId))!.Status);
+        Assert.Equal(now.AddMinutes(1), (await store.Steps.GetAsync(flowInstanceId, dependentStepId))!.UpdatedAt);
+        Assert.Equal(StepStatus.Pending, (await store.Steps.GetAsync(flowInstanceId, unrelatedStepId))!.Status);
+
+        StepInstanceRecord CreateStep(StepId stepId, StepStatus status, List<StepId> dependencies) => new()
+        {
+            FlowInstanceId = flowInstanceId,
+            StepId = stepId,
+            Name = stepId.Value,
+            Kind = StepKind.Step,
+            Status = status,
+            DispatchMode = StepDispatchMode.LocalWorker,
+            Dependencies = dependencies,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+    }
+
+    [Fact]
     public async Task SqliteProvider_ImplementsPersistenceContracts()
     {
         var connectionString = $"Data Source=SpindlePersistenceTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
@@ -45,6 +94,7 @@ public sealed class EntityFrameworkPersistenceTests
         var flowVersion = new FlowVersion("1");
         var instanceId = new FlowInstanceId("instance-1");
         var stepId = new StepId("step-1");
+        var dependencyStepId = new StepId("dependency-1");
         var payload = new SerializedPayload
         {
             ContentType = "application/json",
@@ -78,26 +128,40 @@ public sealed class EntityFrameworkPersistenceTests
         Assert.NotNull(await store.FlowInstances.GetByIdempotencyKeyAsync(flowName, "idempotency-1"));
         Assert.Single(await store.FlowInstances.GetRunnableAsync(10));
 
-        await store.Steps.CreateAsync(new StepInstanceRecord
-        {
-            FlowInstanceId = instanceId,
-            StepId = stepId,
-            Name = "Step 1",
-            Kind = StepKind.Step,
-            Status = StepStatus.Ready,
-            DispatchMode = StepDispatchMode.LocalWorker,
-            Dependencies = [new StepId("dependency-1")],
-            Input = payload,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
+        await store.Steps.CreateManyAsync(
+        [
+            new StepInstanceRecord
+            {
+                FlowInstanceId = instanceId,
+                StepId = dependencyStepId,
+                Name = "Dependency step",
+                Kind = StepKind.Step,
+                Status = StepStatus.Completed,
+                DispatchMode = StepDispatchMode.LocalWorker,
+                CreatedAt = now,
+                UpdatedAt = now,
+            },
+            new StepInstanceRecord
+            {
+                FlowInstanceId = instanceId,
+                StepId = stepId,
+                Name = "Step 1",
+                Kind = StepKind.Step,
+                Status = StepStatus.Ready,
+                DispatchMode = StepDispatchMode.LocalWorker,
+                Dependencies = [dependencyStepId],
+                Input = payload,
+                CreatedAt = now,
+                UpdatedAt = now,
+            }
+        ]);
         Assert.Single(await store.Steps.GetReadyStepsAsync(1));
         await store.Steps.MarkRunningAsync(instanceId, stepId, new StepAttemptId("attempt-1"), "worker", now);
         await store.Steps.MarkCompletedAsync(instanceId, stepId, payload, now.AddMinutes(1));
         var step = await store.Steps.GetAsync(instanceId, stepId);
         Assert.Equal(1, step?.Attempt);
         Assert.Equal(now, step?.StartedAt);
-        Assert.Equal(new StepId("dependency-1"), Assert.Single(step!.Dependencies));
+        Assert.Equal(dependencyStepId, Assert.Single(step!.Dependencies));
 
         await store.Timers.CreateAsync(new TimerRecord
         {

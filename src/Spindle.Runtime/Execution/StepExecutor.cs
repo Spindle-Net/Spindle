@@ -9,7 +9,6 @@ namespace Spindle;
 
 internal sealed class StepExecutor(
     ISpindleStore store,
-    StepScheduler scheduler,
     ISpindleSerializer serializer,
     TimeProvider timeProvider,
     TimeSpan leaseDuration,
@@ -22,7 +21,6 @@ internal sealed class StepExecutor(
     [
         new LocalStepExecutor(
             store,
-            scheduler,
             serializer,
             timeProvider,
             leaseDuration,

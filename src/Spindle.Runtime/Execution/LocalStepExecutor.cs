@@ -10,7 +10,6 @@ namespace Spindle;
 
 internal sealed class LocalStepExecutor(
     ISpindleStore store,
-    StepScheduler scheduler,
     ISpindleSerializer serializer,
     TimeProvider timeProvider,
     TimeSpan leaseDuration,
@@ -166,8 +165,12 @@ internal sealed class LocalStepExecutor(
                                 storeCancellationToken)
                             .ConfigureAwait(false);
 
-                        await scheduler
-                            .MarkDependentsReadyAsync(storeSession, step.FlowInstanceId, storeCancellationToken)
+                        await storeSession.Steps
+                            .MarkDependentsReadyAsync(
+                                step.FlowInstanceId, 
+                                [step.StepId], 
+                                timeProvider.GetUtcNow(), 
+                                storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.Leases
