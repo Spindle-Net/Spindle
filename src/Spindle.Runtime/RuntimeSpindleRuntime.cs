@@ -25,6 +25,8 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
     private readonly StepExecutor _stepExecutor;
     private readonly ConcurrentDictionary<FlowInstanceId, SemaphoreSlim> _instanceGates = new();
 
+    internal FlowRegistry Registry => _registry;
+
     public RuntimeSpindleRuntime(
         ISpindleStore store,
         FlowRegistry? registry = null,
