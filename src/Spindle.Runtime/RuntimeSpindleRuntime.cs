@@ -165,21 +165,6 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (created)
-        {
-            await ExecuteWithInstanceGateAsync(
-                    instanceId,
-                    async gateCancellationToken =>
-                    {
-                        var session = new FlowExecutionSession(instanceId);
-                        await _flowExecutor
-                            .ExecuteAsync(instanceId, session, gateCancellationToken)
-                            .ConfigureAwait(false);
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
         return handle;
     }
 
