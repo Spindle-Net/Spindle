@@ -3,25 +3,28 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Spindle.Persistence.EFCore;
 
 #nullable disable
 
-namespace Spindle.Persistence.EFCore.SqlServer.Migrations
+namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805071502_Add_Indexes_For_StepInstances_And_StepDependencies")]
+    partial class Add_Indexes_For_StepInstances_And_StepDependencies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>
                 {
@@ -29,21 +32,21 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FlowInstanceId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("StepId")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -54,25 +57,25 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("FlowName")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("FlowVersion")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DefinitionHash")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FlowTypeName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("FlowName", "FlowVersion");
 
@@ -83,43 +86,43 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("InstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CorrelationKey")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DefinitionHash")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Error")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FlowName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("FlowVersion")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Input", "Spindle.Persistence.EFCore.Entities.FlowInstanceEntity.Input#SerializedPayload", b1 =>
                         {
@@ -127,25 +130,24 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Input_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Input_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Input_TypeName");
                         });
 
                     b.HasKey("InstanceId");
 
                     b.HasIndex("FlowName", "IdempotencyKey")
-                        .IsUnique()
-                        .HasFilter("[IdempotencyKey] IS NOT NULL");
+                        .IsUnique();
 
                     b.HasIndex("Status", "UpdatedAt");
 
@@ -156,17 +158,17 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("MessageId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("Kind")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("ProcessedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.InboxMessageEntity.Payload#SerializedPayload", b1 =>
                         {
@@ -174,17 +176,17 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_TypeName");
                         });
 
@@ -197,21 +199,21 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("MessageId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Headers")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("jsonb");
 
                     b.Property<string>("Kind")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.OutboxMessageEntity.Payload#SerializedPayload", b1 =>
                         {
@@ -219,17 +221,17 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_TypeName");
                         });
 
@@ -244,22 +246,22 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CorrelationKey")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FlowInstanceId")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("RaisedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.SignalEntity.Payload#SerializedPayload", b1 =>
                         {
@@ -267,17 +269,17 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_TypeName");
                         });
 
@@ -290,29 +292,29 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CorrelationKey")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -325,34 +327,34 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("AttemptId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<int>("Attempt")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Error")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("FlowInstanceId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("StartedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("StepId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("WorkerId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.HasKey("AttemptId");
 
@@ -362,13 +364,13 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
                 {
                     b.Property<string>("FlowInstanceId")
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StepId")
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("DependsOnId")
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.HasKey("FlowInstanceId", "StepId", "DependsOnId");
 
@@ -383,51 +385,51 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<int>("Attempt")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DispatchMode")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Error")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("HandlerId")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<int>("Kind")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Queue")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("RetryAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -442,21 +444,21 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset>("AcquiredAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Owner")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -467,20 +469,20 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("DueAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("FiredAt")
-                        .HasColumnType("datetimeoffset");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -498,17 +500,17 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Payload_TypeName");
 
                             b1.HasKey("ExecutionHistoryEntityId");
@@ -527,24 +529,24 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Definition", b1 =>
                         {
                             b1.Property<string>("FlowDefinitionEntityFlowName")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("FlowDefinitionEntityFlowVersion")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Definition_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Definition_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Definition_TypeName");
 
                             b1.HasKey("FlowDefinitionEntityFlowName", "FlowDefinitionEntityFlowVersion");
@@ -563,21 +565,21 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
                         {
                             b1.Property<string>("FlowInstanceEntityInstanceId")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Result_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Result_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Result_TypeName");
 
                             b1.HasKey("FlowInstanceEntityInstanceId");
@@ -615,24 +617,24 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Input", b1 =>
                         {
                             b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Input_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Input_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Input_TypeName");
 
                             b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
@@ -646,24 +648,24 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
                         {
                             b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("nvarchar(255)");
+                                .HasColumnType("character varying(255)");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Result_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("varbinary(max)")
+                                .HasColumnType("bytea")
                                 .HasColumnName("Result_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("nvarchar(max)")
+                                .HasColumnType("text")
                                 .HasColumnName("Result_TypeName");
 
                             b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");

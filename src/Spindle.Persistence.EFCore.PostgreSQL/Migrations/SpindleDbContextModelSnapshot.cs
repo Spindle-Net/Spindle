@@ -373,6 +373,8 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
 
                     b.HasIndex("FlowInstanceId", "DependsOnId");
 
+                    b.HasIndex("FlowInstanceId", "StepId");
+
                     b.ToTable("StepDependencies");
                 });
 
@@ -429,6 +431,8 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     b.HasKey("FlowInstanceId", "StepId");
 
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("FlowInstanceId", "StepId", "Status");
 
                     b.ToTable("StepInstances", (string)null);
                 });
