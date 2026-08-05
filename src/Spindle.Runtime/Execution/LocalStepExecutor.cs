@@ -5,6 +5,7 @@ using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Steps;
+using Spindle.Runtime;
 
 namespace Spindle;
 
@@ -154,6 +155,7 @@ internal sealed class LocalStepExecutor(
             var result = await registration.Execute(inputs, context)
                 .ConfigureAwait(false);
 
+            await ConcurrencyHelper.AquireLock(step.FlowInstanceId);
             await store
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
@@ -186,6 +188,7 @@ internal sealed class LocalStepExecutor(
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
+            ConcurrencyHelper.ReleaseLock(step.FlowInstanceId);
 
             session.SetResult(step.StepId, result);
 
