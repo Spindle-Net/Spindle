@@ -44,6 +44,11 @@ public sealed class SpindleRuntimePump(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!runtime.Registry.HasDefinition(instance.FlowName, instance.FlowVersion))
+            {
+                continue;
+            }
+
             if (IsQuiescent(instance.InstanceId))
             {
                 continue;

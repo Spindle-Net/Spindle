@@ -73,6 +73,25 @@ public sealed class FlowRegistry
             $"Flow '{flowName}' version '{flowVersion?.ToString() ?? "<latest>"}' is not registered.");
     }
 
+    public bool HasDefinition(
+        FlowName flowName, 
+        FlowVersion? flowVersion = null)
+    {
+        lock (_gate)
+        {
+            var version = flowVersion ?? (_latestVersions.TryGetValue(flowName, out var latest)
+                ? latest
+                : DefaultVersion);
+
+            if (_flows.TryGetValue((flowName, version), out var descriptor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private sealed class DelegateFlow<TRequest, TResult>(
         Func<IFlowContext, TRequest, ValueTask<TResult>> run)
         : ISpindleFlow<TRequest, TResult>
