@@ -41,6 +41,7 @@ internal sealed class LocalStepExecutor(
                         storeSession.Steps.MarkFailedAsync(
                             step.FlowInstanceId,
                             step.StepId,
+                            step.Attempt,
                             "Queued step dispatch is not supported yet.",
                             timeProvider.GetUtcNow(),
                             retryAt: null,
@@ -59,6 +60,7 @@ internal sealed class LocalStepExecutor(
                         storeSession.Steps.MarkFailedAsync(
                             step.FlowInstanceId,
                             step.StepId,
+                            step.Attempt,
                             $"Step dispatch mode '{step.DispatchMode}' is not supported by the local runtime.",
                             timeProvider.GetUtcNow(),
                             retryAt: null,
@@ -160,6 +162,7 @@ internal sealed class LocalStepExecutor(
                             .MarkCompletedAsync(
                                 step.FlowInstanceId,
                                 step.StepId,
+                                step.Attempt,
                                 SerializerReflection.Serialize(serializer, result, registration.ResultType),
                                 timeProvider.GetUtcNow(),
                                 storeCancellationToken)
@@ -198,6 +201,7 @@ internal sealed class LocalStepExecutor(
                             storeSession.Steps.MarkFailedAsync(
                                 step.FlowInstanceId,
                                 step.StepId,
+                                step.Attempt,
                                 exception.Message,
                                 timeProvider.GetUtcNow(),
                                 retryAt: null,

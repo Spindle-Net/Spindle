@@ -157,7 +157,7 @@ public sealed class EntityFrameworkPersistenceTests
         ]);
         Assert.Single(await store.Steps.GetReadyStepsAsync(1));
         await store.Steps.MarkRunningAsync(instanceId, stepId, new StepAttemptId("attempt-1"), "worker", now);
-        await store.Steps.MarkCompletedAsync(instanceId, stepId, payload, now.AddMinutes(1));
+        await store.Steps.MarkCompletedAsync(instanceId, stepId, 1, payload, now.AddMinutes(1));
         var step = await store.Steps.GetAsync(instanceId, stepId);
         Assert.Equal(1, step?.Attempt);
         Assert.Equal(now, step?.StartedAt);

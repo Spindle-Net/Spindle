@@ -295,7 +295,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                         }
 
                         await storeSession.Steps
-                            .MarkCompletedAsync(timer.FlowInstanceId, timer.StepId, result: null, now, storeCancellationToken)
+                            .MarkCompletedAsync(timer.FlowInstanceId, timer.StepId, -1, result: null, now, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.Timers

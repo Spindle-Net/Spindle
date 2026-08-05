@@ -788,24 +788,26 @@ public sealed class RuntimeSpindleRuntimeTests
         public ValueTask MarkCompletedAsync(
             FlowInstanceId flowInstanceId,
             StepId stepId,
+            int attempt,
             SerializedPayload? result,
             DateTimeOffset completedAt,
             CancellationToken cancellationToken = default)
         {
             MarkCompletedCalls++;
-            return inner.MarkCompletedAsync(flowInstanceId, stepId, result, completedAt, cancellationToken);
+            return inner.MarkCompletedAsync(flowInstanceId, stepId, attempt, result, completedAt, cancellationToken);
         }
 
         public ValueTask MarkFailedAsync(
             FlowInstanceId flowInstanceId,
             StepId stepId,
+            int attempt,
             string error,
             DateTimeOffset failedAt,
             DateTimeOffset? retryAt,
             CancellationToken cancellationToken = default)
         {
             MarkFailedCalls++;
-            return inner.MarkFailedAsync(flowInstanceId, stepId, error, failedAt, retryAt, cancellationToken);
+            return inner.MarkFailedAsync(flowInstanceId, stepId, attempt, error, failedAt, retryAt, cancellationToken);
         }
 
         public ValueTask MarkDependentsReadyAsync(

@@ -282,6 +282,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     public async ValueTask MarkCompletedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         SerializedPayload? result,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default)
@@ -302,13 +303,14 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         step.CompletedAt = completedAt;
         step.UpdatedAt = completedAt;
 
-        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Completed, completedAt, null, cancellationToken);
+        await CompleteAttemptAsync(flowInstanceId, stepId, attempt, StepStatus.Completed, completedAt, null, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask MarkFailedAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         string error,
         DateTimeOffset failedAt,
         DateTimeOffset? retryAt,
@@ -332,7 +334,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
                 .SetProperty(x => x.UpdatedAt, _ => failedAt)
             , cancellationToken);
 
-        await CompleteLatestAttempt(flowInstanceId, stepId, StepStatus.Failed, failedAt, error, cancellationToken);
+        await CompleteAttemptAsync(flowInstanceId, stepId, attempt, StepStatus.Failed, failedAt, error, cancellationToken);
     }
 
     public async ValueTask MarkDependentsReadyAsync(
@@ -371,9 +373,10 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         }
     }
 
-    private async Task CompleteLatestAttempt(
+    private async Task CompleteAttemptAsync(
         FlowInstanceId flowInstanceId,
         StepId stepId,
+        int attempt,
         StepStatus status,
         DateTimeOffset completedAt,
         string? error,
@@ -381,9 +384,7 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
     {
         await context.StepAttempts
             // Find the last one
-            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value && !x.CompletedAt.HasValue)
-            .OrderByDescending(x => x.Attempt)
-            .Take(1)
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value && !x.CompletedAt.HasValue && x.Attempt == attempt)
 
             // Update it
             .ExecuteUpdateAsync(u => u
