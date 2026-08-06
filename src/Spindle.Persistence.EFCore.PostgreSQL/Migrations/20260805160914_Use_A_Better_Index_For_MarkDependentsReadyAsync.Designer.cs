@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Spindle.Persistence.EFCore;
@@ -12,9 +13,11 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260805160914_Use_A_Better_Index_For_MarkDependentsReadyAsync")]
+    partial class Use_A_Better_Index_For_MarkDependentsReadyAsync
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
