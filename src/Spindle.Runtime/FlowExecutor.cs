@@ -1,6 +1,7 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence;
+using Spindle.Runtime;
 
 namespace Spindle;
 
@@ -64,8 +65,12 @@ internal sealed class FlowExecutor(
                 services,
                 cancellationToken);
 
-            var result = await descriptor.Execute(context, request)
-                .ConfigureAwait(false);
+            object? result;
+            using (var descriptorActivity = Telemetry.ActivitySource.StartActivity("Execute Descriptor"))
+            {
+                result = await descriptor.Execute(context, request)
+                    .ConfigureAwait(false);
+            }
 
             await store
                 .ExecuteAsync(
@@ -129,6 +134,7 @@ internal sealed class FlowExecutor(
         ISpindleStoreSession storeSession,
         CancellationToken cancellationToken)
     {
+        using var activity = Telemetry.ActivitySource.StartActivity();
         var pending = session.GetPendingStepDeclarations();
 
         if (pending.Count == 0)
