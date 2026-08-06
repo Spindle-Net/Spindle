@@ -358,34 +358,35 @@ internal sealed class EFCoreStepStore(SpindleDbContext context) : IStepStore
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
         activity?.SetTag("spindle.efcore.updated-steps", updatedSteps?.Count ?? 0);
 
+        var q = context.StepInstances
+                .Where(x => x.FlowInstanceId == flowInstanceId.Value)
+                .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting);
+
         if (updatedSteps is { Count: > 0 })
         {
             var updatedStepIds = updatedSteps.Select(x => x.Value).ToList();
 
             // Keep StepInstances as the update root. ExecuteUpdateAsync cannot update a
             // query whose target is reached through SelectMany over a navigation property.
-            await context.StepInstances
-                .Where(x => x.FlowInstanceId == flowInstanceId.Value)
-                .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
-                .Where(x => x.Dependencies.Any(y => updatedStepIds.Contains(y.DependsOnId)))
-                .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
-                .ExecuteUpdateAsync(u => u
-                    .SetProperty(x => x.Status, _ => StepStatus.Ready)
-                    .SetProperty(x => x.UpdatedAt, _ => updatedAt),
-                    cancellationToken);
+
+            if (updatedStepIds.Count == 1)
+            {
+                // Single item -> Skip the JSON parameter serialization
+                var id = updatedStepIds.First();
+                q = q.Where(x => x.Dependencies.Any(y => y.DependsOnId == id));
+            } 
+            else
+            {
+                // Multiple items -> Use IN (OPENJSON)
+                q = q.Where(x => x.Dependencies.Any(y => updatedStepIds.Contains(y.DependsOnId)));
+            }
         }
-        else
-        {
-            // Process the entire dependency graph
-            await context.StepInstances
-                .Where(x => x.FlowInstanceId == flowInstanceId.Value)
-                .Where(x => x.Status == StepStatus.Pending || x.Status == StepStatus.Waiting)
-                .Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
+        
+        await q.Where(x => x.Dependencies.All(y => y.DependsOn!.Status == StepStatus.Completed))
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(x => x.Status, _ => StepStatus.Ready)
                     .SetProperty(x => x.UpdatedAt, _ => updatedAt)
                 , cancellationToken);
-        }
     }
 
     private async Task CompleteAttemptAsync(
