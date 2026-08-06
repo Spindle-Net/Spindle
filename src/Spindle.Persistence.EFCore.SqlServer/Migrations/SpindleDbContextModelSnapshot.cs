@@ -431,9 +431,9 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
                     b.HasKey("FlowInstanceId", "StepId");
 
-                    b.HasIndex("Status", "CreatedAt");
+                    b.HasIndex("FlowInstanceId", "Status");
 
-                    b.HasIndex("FlowInstanceId", "StepId", "Status");
+                    b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("StepInstances", (string)null);
                 });

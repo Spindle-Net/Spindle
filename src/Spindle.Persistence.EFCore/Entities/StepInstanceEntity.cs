@@ -6,8 +6,8 @@ using System.ComponentModel.DataAnnotations;
 namespace Spindle.Persistence.EFCore.Entities;
 
 [PrimaryKey(nameof(FlowInstanceId), nameof(StepId))]
+[Index(nameof(FlowInstanceId), nameof(Status))]
 [Index(nameof(Status), nameof(CreatedAt))]
-[Index(nameof(FlowInstanceId), nameof(StepId), nameof(Status))]
 internal class StepInstanceEntity
 {
     [MaxLength(255)]
