@@ -66,6 +66,7 @@ internal sealed class RuntimeStep<TResult>(
                 : serializer.Deserialize<TResult>(record.Result),
             StepStatus.Failed => throw new InvalidOperationException(
                 $"Step '{id}' failed: {record.Error}"),
+            StepStatus.TimedOut => throw new TaskCanceledException(),
             _ => throw new FlowSuspendedException()
         };
     }

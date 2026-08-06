@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Spindle.Persistence.EFCore;
 
@@ -10,9 +11,11 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.Sqlite.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806130514_MakeSignalPayloadsOptional")]
+    partial class MakeSignalPayloadsOptional
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -269,7 +272,6 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("CorrelationKey")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
@@ -401,9 +403,9 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
 
                     b.HasKey("FlowInstanceId", "StepId");
 
-                    b.HasIndex("Status", "CreatedAt");
+                    b.HasIndex("FlowInstanceId", "Status");
 
-                    b.HasIndex("FlowInstanceId", "StepId", "Status");
+                    b.HasIndex("Status", "CreatedAt");
 
                     b.ToTable("StepInstances", (string)null);
                 });

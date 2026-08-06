@@ -4,6 +4,7 @@ using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Steps;
 using Spindle.Abstractions.Waiting;
 using Spindle.Persistence;
+using Spindle.Persistence.Signals;
 using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 
@@ -207,13 +208,78 @@ internal sealed class RuntimeFlowContext(
         throw new FlowSuspendedException();
     }
 
-    public ValueTask<TSignal> WaitForSignal<TSignal>(
+    public async ValueTask<TSignal?> WaitForSignal<TSignal>(
         SignalName signalName,
-        CorrelationKey? correlationKey = null,
+        CorrelationKey correlationKey,
         SignalWaitOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("Signal waits are not supported by the local MVP runtime yet.");
+        var stepId = new StepId($"{correlationKey.Value}@{signalName.Value}");
+
+        var step = await store.ExecuteAsync(
+                async (storeSession, storeCancellationToken) =>
+                {
+                    if (session.TryGetStep(stepId, out var step))
+                    {
+                        return step!;
+                    }
+
+                    var now = timeProvider.GetUtcNow();
+
+                    await storeSession.Signals
+                        .CreateWaitAsync(
+                            new SignalWaitRecord
+                            {
+                                FlowInstanceId = InstanceId,
+                                StepId = stepId,
+                                SignalName = signalName,
+                                CorrelationKey = correlationKey,
+                                CreatedAt = now,
+                                ExpiresAt = options?.Timeout != null ? now.Add(options.Timeout.Value) : null,
+                            },
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+
+                    var newStep = new StepInstanceRecord
+                    {
+                        FlowInstanceId = session.FlowInstanceId,
+                        StepId = stepId,
+                        Kind = StepKind.SignalWait,
+                        Name = $"Wait for {signalName.Value} with correlation key {correlationKey.Value}",
+                        Status = StepStatus.Waiting,
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        DispatchMode = StepDispatchMode.Immediate,
+                    };
+
+                    await storeSession.Steps
+                        .CreateAsync(newStep, storeCancellationToken)
+                        .ConfigureAwait(false);
+
+                    return newStep;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        session.UpsertStep(step);
+
+        if (step.Status == StepStatus.Completed)
+        {
+            if (step.Result == null) return default;
+            return serializer.Deserialize<TSignal>(step.Result);
+        }
+
+        if (step.Status == StepStatus.Failed)
+        {
+            throw new InvalidOperationException($"Signal step '{stepId}' failed: {step.Error}");
+        }
+
+        if (step.Status == StepStatus.TimedOut)
+        {
+            throw new TaskCanceledException();
+        }
+
+        throw new FlowSuspendedException();
     }
 
     private Step<TResult> DeclareStep<TResult>(

@@ -108,7 +108,7 @@ public sealed class SpindleDbContext(
         modelBuilder.Entity<SignalEntity>(entity =>
         {
             entity.ToTable("Signals");
-            entity.ComplexProperty(
+            entity.OwnsOne(
                 owner => owner.Payload,
                 payload => ConfigurePayload(payload, "Payload"));
         });

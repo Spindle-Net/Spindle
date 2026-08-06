@@ -20,7 +20,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
             FlowInstanceId = wait.FlowInstanceId.Value,
             StepId = wait.StepId.Value,
             SignalName = wait.SignalName.Value,
-            CorrelationKey = wait.CorrelationKey?.Value,
+            CorrelationKey = wait.CorrelationKey.Value,
             CreatedAt = wait.CreatedAt,
             ExpiresAt = wait.ExpiresAt,
             CompletedAt = wait.CompletedAt,
@@ -47,7 +47,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
                 FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
                 StepId = new StepId(x.StepId),
                 SignalName = new SignalName(x.SignalName),
-                CorrelationKey = x.CorrelationKey != null ? new CorrelationKey(x.CorrelationKey) : null,
+                CorrelationKey = new CorrelationKey(x.CorrelationKey),
                 CreatedAt = x.CreatedAt,
                 ExpiresAt = x.ExpiresAt,
                 CompletedAt = x.CompletedAt

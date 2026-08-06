@@ -86,6 +86,7 @@ public interface ISpindleRuntime
     ValueTask SignalAsync<TSignal>(
         FlowInstanceId instanceId,
         SignalName signalName,
+        CorrelationKey correlationKey,
         TSignal payload,
         CancellationToken cancellationToken = default);
 
@@ -93,6 +94,17 @@ public interface ISpindleRuntime
         SignalName signalName,
         CorrelationKey correlationKey,
         TSignal payload,
+        CancellationToken cancellationToken = default);
+
+    ValueTask SignalAsync(
+        FlowInstanceId instanceId,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        CancellationToken cancellationToken = default);
+
+    ValueTask SignalAsync(
+        SignalName signalName,
+        CorrelationKey correlationKey,
         CancellationToken cancellationToken = default);
 
     ValueTask CancelAsync(

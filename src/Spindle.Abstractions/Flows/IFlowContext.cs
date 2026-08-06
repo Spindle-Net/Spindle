@@ -41,9 +41,9 @@ public interface IFlowContext
         DateTimeOffset dueAt,
         CancellationToken cancellationToken = default);
 
-    ValueTask<TSignal> WaitForSignal<TSignal>(
+    ValueTask<TSignal?> WaitForSignal<TSignal>(
         SignalName signalName,
-        CorrelationKey? correlationKey = null,
+        CorrelationKey correlationKey,
         SignalWaitOptions? options = null,
         CancellationToken cancellationToken = default);
 }
