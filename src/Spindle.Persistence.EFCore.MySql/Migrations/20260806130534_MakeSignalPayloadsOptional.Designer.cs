@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Spindle.Persistence.EFCore;
 
@@ -10,9 +11,11 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.MySql.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806130534_MakeSignalPayloadsOptional")]
+    partial class MakeSignalPayloadsOptional
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -271,7 +274,6 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("CorrelationKey")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("varchar(255)");
 

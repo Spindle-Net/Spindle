@@ -11,7 +11,7 @@ public sealed record SignalRecord
 
     public FlowInstanceId? FlowInstanceId { get; init; }
 
-    public required SerializedPayload Payload { get; init; }
+    public required SerializedPayload? Payload { get; init; }
 
     public required DateTimeOffset RaisedAt { get; init; }
 }

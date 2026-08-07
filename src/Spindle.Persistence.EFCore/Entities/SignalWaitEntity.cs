@@ -18,7 +18,7 @@ internal class SignalWaitEntity
     public required string SignalName { get; init; }
 
     [MaxLength(255)]
-    public string? CorrelationKey { get; init; }
+    public required string CorrelationKey { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
 

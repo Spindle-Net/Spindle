@@ -10,7 +10,7 @@ public sealed record SignalWaitRecord
 
     public required SignalName SignalName { get; init; }
 
-    public CorrelationKey? CorrelationKey { get; init; }
+    public CorrelationKey CorrelationKey { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
 

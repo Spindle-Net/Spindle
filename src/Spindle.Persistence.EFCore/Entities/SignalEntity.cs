@@ -12,7 +12,7 @@ internal class SignalEntity
 
     public string? FlowInstanceId { get; init; }
 
-    public required SerializedPayload Payload { get; init; }
+    public required SerializedPayload? Payload { get; init; }
 
     public required DateTimeOffset RaisedAt { get; init; }
 }

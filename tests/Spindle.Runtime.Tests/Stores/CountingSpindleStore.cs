@@ -1,0 +1,53 @@
+﻿using Spindle.Persistence;
+using Spindle.Persistence.FlowDefinitions;
+using Spindle.Persistence.FlowInstances;
+using Spindle.Persistence.History;
+using Spindle.Persistence.Leases;
+using Spindle.Persistence.Messaging;
+using Spindle.Persistence.Signals;
+using Spindle.Persistence.Steps;
+using Spindle.Persistence.Timers;
+
+namespace Spindle.Runtime.Tests.Stores;
+
+internal sealed class CountingSpindleStore : ISpindleStore
+{
+    private readonly ISpindleStore _inner;
+
+    public CountingSpindleStore(
+        ISpindleStore inner)
+    {
+        _inner = inner;
+        Steps = new CountingStepStore(inner.Steps);
+    }
+
+    public IFlowDefinitionStore FlowDefinitions => _inner.FlowDefinitions;
+
+    public IFlowInstanceStore FlowInstances => _inner.FlowInstances;
+
+    public CountingStepStore Steps { get; }
+
+    IStepStore ISpindleStore.Steps => Steps;
+
+    public ITimerStore Timers => _inner.Timers;
+
+    public ISignalStore Signals => _inner.Signals;
+
+    public IOutboxStore Outbox => _inner.Outbox;
+
+    public IInboxStore Inbox => _inner.Inbox;
+
+    public ILeaseStore Leases => _inner.Leases;
+
+    public IExecutionHistoryStore History => _inner.History;
+
+    public ValueTask<TResult> ExecuteAsync<TResult>(
+        Func<ISpindleStoreSession, CancellationToken, ValueTask<TResult>> operation,
+        CancellationToken cancellationToken = default)
+    {
+        return _inner.ExecuteAsync(
+            (session, storeCancellationToken) =>
+                operation(new CountingStoreSession(session, Steps), storeCancellationToken),
+            cancellationToken);
+    }
+}

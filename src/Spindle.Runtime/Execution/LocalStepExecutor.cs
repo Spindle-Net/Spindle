@@ -22,8 +22,6 @@ internal sealed class LocalStepExecutor(
     public bool SupportsDispatchMode(StepDispatchMode mode) =>
         mode is StepDispatchMode.Immediate or StepDispatchMode.LocalWorker;
 
-
-
     public async Task<StepExecutionResult> ExecuteAsync(
         FlowExecutionSession session,
         StepInstanceRecord step,

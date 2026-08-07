@@ -260,26 +260,6 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.SignalEntity.Payload#SerializedPayload", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("Payload_ContentType");
-
-                            b1.Property<byte[]>("Data")
-                                .IsRequired()
-                                .HasColumnType("bytea")
-                                .HasColumnName("Payload_Data");
-
-                            b1.Property<string>("TypeName")
-                                .IsRequired()
-                                .HasColumnType("text")
-                                .HasColumnName("Payload_TypeName");
-                        });
-
                     b.HasKey("Id");
 
                     b.ToTable("Signals", (string)null);
@@ -299,6 +279,7 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CorrelationKey")
+                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
@@ -588,6 +569,39 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                         });
 
                     b.Navigation("Result");
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.SignalEntity", b =>
+                {
+                    b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Payload", b1 =>
+                        {
+                            b1.Property<int>("SignalEntityId")
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("Payload_ContentType");
+
+                            b1.Property<byte[]>("Data")
+                                .IsRequired()
+                                .HasColumnType("bytea")
+                                .HasColumnName("Payload_Data");
+
+                            b1.Property<string>("TypeName")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("Payload_TypeName");
+
+                            b1.HasKey("SignalEntityId");
+
+                            b1.ToTable("Signals");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SignalEntityId");
+                        });
+
+                    b.Navigation("Payload");
                 });
 
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>

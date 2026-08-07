@@ -482,23 +482,87 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                 afterSteps?.Status == FlowInstanceStatus.Failed ? 1 : 0);
     }
 
-    public ValueTask SignalAsync<TSignal>(
-        FlowInstanceId instanceId,
+    private async ValueTask InternalSignalAsync<TSignal>(
+        FlowInstanceId? instanceId,
         SignalName signalName,
-        TSignal payload,
-        CancellationToken cancellationToken = default)
+        CorrelationKey correlationKey,
+        TSignal? payload,
+        CancellationToken cancellationToken = default
+    )
     {
-        throw new NotSupportedException("Signal delivery is not supported by the local MVP runtime yet.");
+        var now = _timeProvider.GetUtcNow();
+        await _store
+            .ExecuteAsync(
+                async (storeSession, storeCancellationToken) =>
+                {
+                    var pl = payload != null ? _serializer.Serialize(payload) : null;
+                    // Start by logging it
+                    await storeSession.Signals.AppendSignalAsync(new Persistence.Signals.SignalRecord
+                    {
+                        FlowInstanceId = instanceId,
+                        SignalName = signalName,
+                        CorrelationKey = correlationKey,
+                        Payload = pl,
+                        RaisedAt = DateTimeOffset.Now
+                    }, storeCancellationToken);
+
+                    var open = await storeSession.Signals.GetOpenWaitsAsync(signalName, correlationKey, storeCancellationToken);
+                    // If instance is specified, then filter
+                    if (instanceId.HasValue)
+                        open = [.. open.Where(x => x.FlowInstanceId == instanceId)];
+
+                    foreach (var wait in open)
+                    {
+                        var step = await storeSession.Steps.GetAsync(wait.FlowInstanceId, wait.StepId, storeCancellationToken);
+                        // Don't set it to completed if the step is not waiting
+                        // If the step is not waiting that means that the step proabaly is not expecting a signal
+                        if (step is { Status: StepStatus.Waiting })
+                        {
+                            await storeSession.Steps.MarkCompletedAsync(
+                                wait.FlowInstanceId, 
+                                wait.StepId, 
+                                step.Attempt, 
+                                pl, 
+                                now, 
+                                storeCancellationToken);
+                        }
+
+                        // Mark the wait as completed to clear it from the next run
+                        await storeSession.Signals.MarkWaitCompletedAsync(wait.FlowInstanceId, wait.StepId, now, storeCancellationToken);
+                    }
+                },
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
-    public ValueTask SignalAsync<TSignal>(
+    public async ValueTask SignalAsync<TSignal>(
+        FlowInstanceId instanceId,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        TSignal payload,
+        CancellationToken cancellationToken = default) 
+        => await InternalSignalAsync<TSignal>(instanceId, signalName, correlationKey, payload, cancellationToken);
+
+    public async ValueTask SignalAsync<TSignal>(
         SignalName signalName,
         CorrelationKey correlationKey,
         TSignal payload,
         CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException("Signal delivery is not supported by the local MVP runtime yet.");
-    }
+        => await InternalSignalAsync<TSignal>(null, signalName, correlationKey, payload, cancellationToken);
+
+    public async ValueTask SignalAsync(
+        FlowInstanceId instanceId,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        CancellationToken cancellationToken = default)
+        => await InternalSignalAsync<Unit?>(instanceId, signalName, correlationKey, null, cancellationToken);
+
+    public async ValueTask SignalAsync(
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        CancellationToken cancellationToken = default)
+        => await InternalSignalAsync<Unit?>(null, signalName, correlationKey, null, cancellationToken);
 
     public async ValueTask CancelAsync(
         FlowInstanceId instanceId,

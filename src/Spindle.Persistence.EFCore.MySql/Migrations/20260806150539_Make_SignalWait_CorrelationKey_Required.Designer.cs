@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Spindle.Persistence.EFCore;
 
@@ -10,9 +11,11 @@ using Spindle.Persistence.EFCore;
 namespace Spindle.Persistence.EFCore.MySql.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806150539_Make_SignalWait_CorrelationKey_Required")]
+    partial class Make_SignalWait_CorrelationKey_Required
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -403,9 +406,9 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
 
                     b.HasKey("FlowInstanceId", "StepId");
 
-                    b.HasIndex("FlowInstanceId", "Status");
-
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("FlowInstanceId", "StepId", "Status");
 
                     b.ToTable("StepInstances", (string)null);
                 });

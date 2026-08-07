@@ -2,42 +2,43 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Spindle.Persistence.EFCore;
 
 #nullable disable
 
-namespace Spindle.Persistence.EFCore.MySql.Migrations
+namespace Spindle.Persistence.EFCore.Sqlite.Migrations
 {
     [DbContext(typeof(SpindleDbContext))]
-    partial class SpindleDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806150452_Make_SignalWait_CorrelationKey_Required")]
+    partial class Make_SignalWait_CorrelationKey_Required
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 64);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowInstanceId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -48,25 +49,25 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("FlowName")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowVersion")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefinitionHash")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowTypeName")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("UpdatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FlowName", "FlowVersion");
 
@@ -77,43 +78,43 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("InstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("CompletedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CorrelationKey")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DefinitionHash")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Error")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowVersion")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("UpdatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Input", "Spindle.Persistence.EFCore.Entities.FlowInstanceEntity.Input#SerializedPayload", b1 =>
                         {
@@ -121,17 +122,17 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Input_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Input_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Input_TypeName");
                         });
 
@@ -149,17 +150,17 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("MessageId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("ProcessedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("ReceivedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.InboxMessageEntity.Payload#SerializedPayload", b1 =>
                         {
@@ -167,17 +168,17 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_TypeName");
                         });
 
@@ -190,21 +191,21 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("MessageId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Headers")
                         .IsRequired()
-                        .HasColumnType("json");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("PublishedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Payload", "Spindle.Persistence.EFCore.Entities.OutboxMessageEntity.Payload#SerializedPayload", b1 =>
                         {
@@ -212,17 +213,17 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_TypeName");
                         });
 
@@ -237,20 +238,20 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CorrelationKey")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowInstanceId")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("RaisedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -261,30 +262,30 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("CompletedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CorrelationKey")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("ExpiresAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -297,34 +298,34 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("AttemptId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Attempt")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CompletedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Error")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FlowInstanceId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("StartedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StepId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("WorkerId")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("AttemptId");
 
@@ -334,13 +335,13 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
                 {
                     b.Property<string>("FlowInstanceId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DependsOnId")
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("FlowInstanceId", "StepId", "DependsOnId");
 
@@ -355,57 +356,57 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Attempt")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CompletedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("DispatchMode")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Error")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("HandlerId")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Kind")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Queue")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("RetryAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("StartedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("UpdatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
-                    b.HasIndex("FlowInstanceId", "Status");
-
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("FlowInstanceId", "StepId", "Status");
 
                     b.ToTable("StepInstances", (string)null);
                 });
@@ -414,21 +415,21 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("AcquiredAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("ExpiresAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Owner")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -439,20 +440,20 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StepId")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("DueAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("FiredAt")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FlowInstanceId", "StepId");
 
@@ -466,21 +467,21 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Payload", b1 =>
                         {
                             b1.Property<long>("ExecutionHistoryEntityId")
-                                .HasColumnType("bigint");
+                                .HasColumnType("INTEGER");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_TypeName");
 
                             b1.HasKey("ExecutionHistoryEntityId");
@@ -499,24 +500,24 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Definition", b1 =>
                         {
                             b1.Property<string>("FlowDefinitionEntityFlowName")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("FlowDefinitionEntityFlowVersion")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Definition_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Definition_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Definition_TypeName");
 
                             b1.HasKey("FlowDefinitionEntityFlowName", "FlowDefinitionEntityFlowVersion");
@@ -535,21 +536,21 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
                         {
                             b1.Property<string>("FlowInstanceEntityInstanceId")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Result_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Result_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Result_TypeName");
 
                             b1.HasKey("FlowInstanceEntityInstanceId");
@@ -568,21 +569,21 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Payload", b1 =>
                         {
                             b1.Property<int>("SignalEntityId")
-                                .HasColumnType("int");
+                                .HasColumnType("INTEGER");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Payload_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Payload_TypeName");
 
                             b1.HasKey("SignalEntityId");
@@ -620,24 +621,24 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Input", b1 =>
                         {
                             b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Input_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Input_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Input_TypeName");
 
                             b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
@@ -651,24 +652,24 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
                         {
                             b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("varchar(255)");
+                                .HasColumnType("TEXT");
 
                             b1.Property<string>("ContentType")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Result_ContentType");
 
                             b1.Property<byte[]>("Data")
                                 .IsRequired()
-                                .HasColumnType("longblob")
+                                .HasColumnType("BLOB")
                                 .HasColumnName("Result_Data");
 
                             b1.Property<string>("TypeName")
                                 .IsRequired()
-                                .HasColumnType("longtext")
+                                .HasColumnType("TEXT")
                                 .HasColumnName("Result_TypeName");
 
                             b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
