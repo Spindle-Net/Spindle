@@ -1,4 +1,5 @@
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle.Benchmarks;
@@ -9,13 +10,13 @@ internal static class BenchmarkFlows
     {
         return async (context, _) =>
         {
-            Step<int> current = AddStep(context, "step-0000", []);
+            StepNode<int> current = AddStep(context, "step-0000", []);
             for (var index = 1; index < stepCount; index++)
             {
                 current = AddStep(context, $"step-{index:D4}", [current]);
             }
 
-            await context.WaitAll(current);
+            await context.WaitAll("wait-all", "Wait for all", current);
             return stepCount;
         };
     }
@@ -42,7 +43,7 @@ internal static class BenchmarkFlows
                 .Select(index => AddStep(context, $"leaf-{index:D4}", [root]))
                 .ToArray();
 
-            await context.WaitAll([.. leaves]);
+            await context.WaitAll("wait-all", "Wait for all", [.. leaves]);
             return leaves.Length + 1;
         };
     }
@@ -56,7 +57,7 @@ internal static class BenchmarkFlows
                 .ToArray();
             var join = AddStep(context, "join", [.. roots]);
 
-            await context.WaitAll(join);
+            await context.WaitAll("wait-all", "Wait for all", join);
             return roots.Length + 1;
         };
     }
@@ -71,12 +72,12 @@ internal static class BenchmarkFlows
                 .ToArray();
             var join = AddStep(context, "join", [.. middle]);
 
-            await context.WaitAll(join);
+            await context.WaitAll("wait-all", "Wait for all", join);
             return middle.Length + 2;
         };
     }
 
-    private static Step<int> AddStep(IFlowContext context, string id, IReadOnlyList<Step> dependencies)
+    private static StepNode<int> AddStep(IFlowContext context, string id, IReadOnlyList<Node> dependencies)
     {
         return context.Step<int>(id, "Step", dependencies, static (_, _) => ValueTask.FromResult(1));
     }

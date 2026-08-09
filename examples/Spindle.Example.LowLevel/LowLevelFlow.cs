@@ -33,7 +33,7 @@ public class LowLevelFlow : ISpindleFlow<LowLevelFlowInput, LowLevelFlowOutput>
             });
 
         // Wait for all of them to complete in parallel
-        await ctx.WaitAll(upper, lower, camelCase);
+        await ctx.WaitAll("wait-all", "Wait for transformations", upper, lower, camelCase);
 
         // Build the result from the step results
         return new LowLevelFlowOutput(

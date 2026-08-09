@@ -6,7 +6,7 @@ namespace Spindle.Persistence.InMemory.Stores;
 public sealed class InMemoryLeaseStore : ILeaseStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<(FlowInstanceId FlowInstanceId, StepId StepId), StepLeaseRecord> _leases = [];
+    private readonly Dictionary<(FlowInstanceId FlowInstanceId, NodeId NodeId), StepLeaseRecord> _leases = [];
 
     public ValueTask<bool> TryAcquireStepLeaseAsync(
         StepLeaseRecord lease,
@@ -16,7 +16,7 @@ public sealed class InMemoryLeaseStore : ILeaseStore
 
         lock (_gate)
         {
-            var key = (lease.FlowInstanceId, lease.StepId);
+            var key = (lease.FlowInstanceId, lease.NodeId);
             if (_leases.TryGetValue(key, out var existing) &&
                 existing.ExpiresAt > lease.AcquiredAt &&
                 !string.Equals(existing.Owner, lease.Owner, StringComparison.Ordinal))
@@ -31,7 +31,7 @@ public sealed class InMemoryLeaseStore : ILeaseStore
 
     public ValueTask ReleaseStepLeaseAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         string owner,
         CancellationToken cancellationToken = default)
     {
@@ -39,7 +39,7 @@ public sealed class InMemoryLeaseStore : ILeaseStore
 
         lock (_gate)
         {
-            var key = (flowInstanceId, stepId);
+            var key = (flowInstanceId, nodeId);
             if (_leases.TryGetValue(key, out var existing) &&
                 string.Equals(existing.Owner, owner, StringComparison.Ordinal))
             {

@@ -1,17 +1,18 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle;
 
 public static class FlowContextStepHandlerExtensions
 {
-    public static Step<TResult> StepHandler<T1, TRequest, TResult>(
+    public static StepNode<TResult> StepHandler<T1, TRequest, TResult>(
         this IFlowContext context,
         string id,
         string name,
         StepHandlerId handlerId,
-        Step<T1> input1,
+        Node<T1> input1,
         Func<T1, TRequest> createRequest,
         StepOptions? options = null)
     {
@@ -26,13 +27,13 @@ public static class FlowContextStepHandlerExtensions
             options);
     }
 
-    public static Step<TResult> StepHandler<T1, T2, TRequest, TResult>(
+    public static StepNode<TResult> StepHandler<T1, T2, TRequest, TResult>(
         this IFlowContext context,
         string id,
         string name,
         StepHandlerId handlerId,
-        Step<T1> input1,
-        Step<T2> input2,
+        Node<T1> input1,
+        Node<T2> input2,
         Func<T1, T2, TRequest> createRequest,
         StepOptions? options = null)
     {

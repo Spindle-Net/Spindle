@@ -17,7 +17,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         var existing = await context.Timers.FirstOrDefaultAsync(x => x.FlowInstanceId == timer.FlowInstanceId.Value &&
-                                                                     x.StepId == timer.StepId.Value, cancellationToken);
+                                                                     x.NodeId == timer.NodeId.Value, cancellationToken);
 
         if (existing != null)
         {
@@ -29,7 +29,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
             await context.Timers.AddAsync(new Entities.TimerEntity
             {
                 FlowInstanceId = timer.FlowInstanceId.Value,
-                StepId = timer.StepId.Value,
+                NodeId = timer.NodeId.Value,
                 DueAt = timer.DueAt,
                 CreatedAt = timer.CreatedAt,
                 FiredAt = timer.FiredAt,
@@ -42,7 +42,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
     private readonly static Expression<Func<TimerEntity, TimerRecord>> Translation = x => new TimerRecord
     {
         FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
-        StepId = new StepId(x.StepId),
+        NodeId = new NodeId(x.NodeId),
         DueAt = x.DueAt,
         CreatedAt = x.CreatedAt,
         FiredAt = x.FiredAt
@@ -50,14 +50,14 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
 
     public async ValueTask<TimerRecord?> GetAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         return await context.Timers
-            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
             .Select(Translation)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -81,7 +81,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
 
     public async ValueTask MarkFiredAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset firedAt,
         CancellationToken cancellationToken = default)
     {
@@ -89,7 +89,7 @@ internal sealed class EFCoreTimerStore(SpindleDbContext context) : ITimerStore
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
 
         await context.Timers
-            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.StepId == stepId.Value)
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(x => x.FiredAt, _ => firedAt)
             , cancellationToken);

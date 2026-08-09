@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Spindle.Persistence.EFCore.Entities;
 
-[PrimaryKey(nameof(FlowInstanceId), nameof(StepId))]
+[PrimaryKey(nameof(FlowInstanceId), nameof(NodeId))]
 [Index(nameof(SignalName), nameof(CorrelationKey), nameof(CompletedAt))]
 internal class SignalWaitEntity
 {
@@ -12,7 +12,7 @@ internal class SignalWaitEntity
     public required string FlowInstanceId { get; init; }
 
     [MaxLength(255)]
-    public required string StepId { get; init; }
+    public required string NodeId { get; init; }
 
     [MaxLength(255)]
     public required string SignalName { get; init; }

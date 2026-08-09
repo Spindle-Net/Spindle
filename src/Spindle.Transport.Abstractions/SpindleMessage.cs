@@ -17,7 +17,7 @@ public sealed record SpindleMessage
 
     public FlowInstanceId? FlowInstanceId { get; init; }
 
-    public StepId? StepId { get; init; }
+    public NodeId? NodeId { get; init; }
 
     public StepAttemptId? AttemptId { get; init; }
 

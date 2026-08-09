@@ -42,7 +42,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("StepId")
+                    b.Property<string>("NodeId")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -193,6 +193,91 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.ToTable("InboxMessages", (string)null);
                 });
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.NodeDependencyEntity", b =>
+                {
+                    b.Property<string>("FlowInstanceId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("NodeId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("DependsOnId")
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("int");
+
+                    b.HasKey("FlowInstanceId", "NodeId", "DependsOnId");
+
+                    b.HasIndex("FlowInstanceId", "DependsOnId");
+
+                    b.HasIndex("FlowInstanceId", "NodeId");
+
+                    b.ToTable("NodeDependencies");
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", b =>
+                {
+                    b.Property<string>("FlowInstanceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("NodeId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DependencyMode")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DispatchMode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HandlerId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Queue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("RetryAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("FlowInstanceId", "NodeId");
+
+                    b.HasIndex("FlowInstanceId", "Status");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("NodeInstances", (string)null);
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.OutboxMessageEntity", b =>
                 {
                     b.Property<string>("MessageId")
@@ -272,7 +357,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("StepId")
+                    b.Property<string>("NodeId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -295,7 +380,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.HasKey("FlowInstanceId", "StepId");
+                    b.HasKey("FlowInstanceId", "NodeId");
 
                     b.HasIndex("SignalName", "CorrelationKey", "CompletedAt");
 
@@ -321,15 +406,15 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
-
-                    b.Property<string>("StepId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("WorkerId")
                         .IsRequired()
@@ -340,92 +425,13 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.ToTable("StepAttempts", (string)null);
                 });
 
-            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
-                {
-                    b.Property<string>("FlowInstanceId")
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("StepId")
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("DependsOnId")
-                        .HasColumnType("nvarchar(255)");
-
-                    b.HasKey("FlowInstanceId", "StepId", "DependsOnId");
-
-                    b.HasIndex("FlowInstanceId", "DependsOnId");
-
-                    b.HasIndex("FlowInstanceId", "StepId");
-
-                    b.ToTable("StepDependencies");
-                });
-
-            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
-                {
-                    b.Property<string>("FlowInstanceId")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<string>("StepId")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<int>("Attempt")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("DispatchMode")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Error")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("HandlerId")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Kind")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Queue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset?>("RetryAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("FlowInstanceId", "StepId");
-
-                    b.HasIndex("FlowInstanceId", "Status");
-
-                    b.HasIndex("Status", "CreatedAt");
-
-                    b.ToTable("StepInstances", (string)null);
-                });
-
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepLeaseEntity", b =>
                 {
                     b.Property<string>("FlowInstanceId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("StepId")
+                    b.Property<string>("NodeId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -439,7 +445,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("FlowInstanceId", "StepId");
+                    b.HasKey("FlowInstanceId", "NodeId");
 
                     b.ToTable("StepLeases", (string)null);
                 });
@@ -450,7 +456,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
-                    b.Property<string>("StepId")
+                    b.Property<string>("NodeId")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -463,7 +469,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Property<DateTimeOffset?>("FiredAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.HasKey("FlowInstanceId", "StepId");
+                    b.HasKey("FlowInstanceId", "NodeId");
 
                     b.HasIndex("FiredAt", "DueAt");
 
@@ -572,6 +578,94 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Navigation("Result");
                 });
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.NodeDependencyEntity", b =>
+                {
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", "DependsOn")
+                        .WithMany("Dependents")
+                        .HasForeignKey("FlowInstanceId", "DependsOnId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", "Node")
+                        .WithMany("Dependencies")
+                        .HasForeignKey("FlowInstanceId", "NodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DependsOn");
+
+                    b.Navigation("Node");
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", b =>
+                {
+                    b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Input", b1 =>
+                        {
+                            b1.Property<string>("NodeInstanceEntityFlowInstanceId")
+                                .HasColumnType("nvarchar(255)");
+
+                            b1.Property<string>("NodeInstanceEntityNodeId")
+                                .HasColumnType("nvarchar(255)");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("Input_ContentType");
+
+                            b1.Property<byte[]>("Data")
+                                .IsRequired()
+                                .HasColumnType("varbinary(max)")
+                                .HasColumnName("Input_Data");
+
+                            b1.Property<string>("TypeName")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("Input_TypeName");
+
+                            b1.HasKey("NodeInstanceEntityFlowInstanceId", "NodeInstanceEntityNodeId");
+
+                            b1.ToTable("NodeInstances");
+
+                            b1.WithOwner()
+                                .HasForeignKey("NodeInstanceEntityFlowInstanceId", "NodeInstanceEntityNodeId");
+                        });
+
+                    b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
+                        {
+                            b1.Property<string>("NodeInstanceEntityFlowInstanceId")
+                                .HasColumnType("nvarchar(255)");
+
+                            b1.Property<string>("NodeInstanceEntityNodeId")
+                                .HasColumnType("nvarchar(255)");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("Result_ContentType");
+
+                            b1.Property<byte[]>("Data")
+                                .IsRequired()
+                                .HasColumnType("varbinary(max)")
+                                .HasColumnName("Result_Data");
+
+                            b1.Property<string>("TypeName")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)")
+                                .HasColumnName("Result_TypeName");
+
+                            b1.HasKey("NodeInstanceEntityFlowInstanceId", "NodeInstanceEntityNodeId");
+
+                            b1.ToTable("NodeInstances");
+
+                            b1.WithOwner()
+                                .HasForeignKey("NodeInstanceEntityFlowInstanceId", "NodeInstanceEntityNodeId");
+                        });
+
+                    b.Navigation("Input");
+
+                    b.Navigation("Result");
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.SignalEntity", b =>
                 {
                     b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Payload", b1 =>
@@ -605,95 +699,7 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Navigation("Payload");
                 });
 
-            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepDependencyEntity", b =>
-                {
-                    b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "DependsOn")
-                        .WithMany("Dependents")
-                        .HasForeignKey("FlowInstanceId", "DependsOnId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", "Step")
-                        .WithMany("Dependencies")
-                        .HasForeignKey("FlowInstanceId", "StepId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DependsOn");
-
-                    b.Navigation("Step");
-                });
-
-            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
-                {
-                    b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Input", b1 =>
-                        {
-                            b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("nvarchar(255)");
-
-                            b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("nvarchar(255)");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)")
-                                .HasColumnName("Input_ContentType");
-
-                            b1.Property<byte[]>("Data")
-                                .IsRequired()
-                                .HasColumnType("varbinary(max)")
-                                .HasColumnName("Input_Data");
-
-                            b1.Property<string>("TypeName")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)")
-                                .HasColumnName("Input_TypeName");
-
-                            b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
-
-                            b1.ToTable("StepInstances");
-
-                            b1.WithOwner()
-                                .HasForeignKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
-                        });
-
-                    b.OwnsOne("Spindle.Abstractions.Snapshot.SerializedPayload", "Result", b1 =>
-                        {
-                            b1.Property<string>("StepInstanceEntityFlowInstanceId")
-                                .HasColumnType("nvarchar(255)");
-
-                            b1.Property<string>("StepInstanceEntityStepId")
-                                .HasColumnType("nvarchar(255)");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)")
-                                .HasColumnName("Result_ContentType");
-
-                            b1.Property<byte[]>("Data")
-                                .IsRequired()
-                                .HasColumnType("varbinary(max)")
-                                .HasColumnName("Result_Data");
-
-                            b1.Property<string>("TypeName")
-                                .IsRequired()
-                                .HasColumnType("nvarchar(max)")
-                                .HasColumnName("Result_TypeName");
-
-                            b1.HasKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
-
-                            b1.ToTable("StepInstances");
-
-                            b1.WithOwner()
-                                .HasForeignKey("StepInstanceEntityFlowInstanceId", "StepInstanceEntityStepId");
-                        });
-
-                    b.Navigation("Input");
-
-                    b.Navigation("Result");
-                });
-
-            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.StepInstanceEntity", b =>
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", b =>
                 {
                     b.Navigation("Dependencies");
 

@@ -1,131 +1,137 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 
 namespace Spindle;
 
 internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
 {
-    private readonly Dictionary<StepId, StepExecutionRegistration> _registrations = [];
-    private readonly Dictionary<StepId, StepInstanceRecord> _steps = [];
-    private readonly Dictionary<StepId, object?> _results = [];
-    private readonly List<StepId> _pendingStepDeclarations = [];
+    private readonly Dictionary<NodeId, StepExecutionRegistration> _registrations = [];
+    private readonly Dictionary<NodeId, NodeInstanceRecord> _nodes = [];
+    private readonly Dictionary<NodeId, object?> _results = [];
+    private readonly List<NodeId> _pendingNodeDeclarations = [];
+    private readonly Dictionary<NodeId, NodeInitialization> _pendingInitializations = [];
 
     public FlowInstanceId FlowInstanceId { get; } = flowInstanceId;
 
     public void BeginReplay(
-        IReadOnlyList<StepInstanceRecord> steps)
+        IReadOnlyList<NodeInstanceRecord> nodes)
     {
-        ArgumentNullException.ThrowIfNull(steps);
+        ArgumentNullException.ThrowIfNull(nodes);
 
         _registrations.Clear();
-        _steps.Clear();
-        _pendingStepDeclarations.Clear();
+        _nodes.Clear();
+        _pendingNodeDeclarations.Clear();
+        _pendingInitializations.Clear();
         lock (_results)
         {
             _results.Clear();
         }
 
-        foreach (var step in steps)
+        foreach (var node in nodes)
         {
-            _steps[step.StepId] = step;
+            _nodes[node.NodeId] = node;
         }
     }
 
     public void Register<TResult>(
-        StepId stepId,
+        NodeId nodeId,
         IReadOnlyList<Type> dependencyResultTypes,
         StepCallback<TResult> callback)
     {
-        async ValueTask<object?> Execute(StepInputs inputs, IStepExecutionContext context)
+        async ValueTask<object?> Execute(NodeInputs inputs, IStepExecutionContext context)
         {
             return await callback(inputs, context).ConfigureAwait(false);
         }
 
-        _registrations[stepId] = new StepExecutionRegistration(
-            stepId,
+        _registrations[nodeId] = new StepExecutionRegistration(
+            nodeId,
             typeof(TResult),
             dependencyResultTypes.ToArray(),
             Execute);
     }
 
     public bool TryGet(
-        StepId stepId,
+        NodeId nodeId,
         out StepExecutionRegistration registration)
     {
-        return _registrations.TryGetValue(stepId, out registration!);
+        return _registrations.TryGetValue(nodeId, out registration!);
     }
 
-    public bool TryGetStep(
-        StepId stepId,
-        out StepInstanceRecord step)
+    public bool TryGetNode(
+        NodeId nodeId,
+        out NodeInstanceRecord node)
     {
-        return _steps.TryGetValue(stepId, out step!);
+        return _nodes.TryGetValue(nodeId, out node!);
     }
 
     public bool TryGetResult(
-        StepId stepId,
+        NodeId nodeId,
         out object? result)
     {
         lock (_results)
         {
-            return _results.TryGetValue(stepId, out result);
+            return _results.TryGetValue(nodeId, out result);
         }
     }
 
     public void SetResult(
-        StepId stepId,
+        NodeId nodeId,
         object? result)
     {
         lock (_results)
         {
-            _results[stepId] = result;
+            _results[nodeId] = result;
         }
     }
 
-    public IReadOnlyList<StepInstanceRecord> GetStepsSnapshot()
+    public IReadOnlyList<NodeInstanceRecord> GetNodesSnapshot()
     {
-        return _steps.Values
-            .OrderBy(step => step.CreatedAt)
-            .ThenBy(step => step.StepId.Value, StringComparer.Ordinal)
+        return _nodes.Values
+            .OrderBy(node => node.CreatedAt)
+            .ThenBy(node => node.NodeId.Value, StringComparer.Ordinal)
             .ToArray();
     }
 
-    public bool TryDeclareStep(
-        StepInstanceRecord step)
+    public bool TryDeclareNode(
+        NodeInstanceRecord node,
+        NodeInitialization? initialization = null)
     {
-        if (_steps.ContainsKey(step.StepId))
+        if (_nodes.ContainsKey(node.NodeId))
         {
             return false;
         }
 
-        _steps.Add(step.StepId, step);
-        _pendingStepDeclarations.Add(step.StepId);
+        _nodes.Add(node.NodeId, node);
+        _pendingNodeDeclarations.Add(node.NodeId);
+        if (initialization is not null)
+        {
+            _pendingInitializations.Add(node.NodeId, initialization);
+        }
         return true;
     }
 
-    public void UpsertStep(
-        StepInstanceRecord step)
+    public void UpsertNode(
+        NodeInstanceRecord node)
     {
-        _steps[step.StepId] = step;
+        _nodes[node.NodeId] = node;
     }
 
-    public IReadOnlyList<StepInstanceRecord> GetPendingStepDeclarations()
+    public IReadOnlyList<NodeInstanceRecord> GetPendingNodeDeclarations()
     {
-        return _pendingStepDeclarations
-            .Select(stepId => _steps[stepId])
+        return _pendingNodeDeclarations
+            .Select(nodeId => _nodes[nodeId])
             .ToArray();
     }
 
-    public void MarkStepDeclarationsFlushed()
+    public IReadOnlyList<NodeInitialization> GetPendingNodeInitializations()
+        => _pendingInitializations.Values.ToArray();
+
+    public void MarkNodeDeclarationsFlushed()
     {
-        _pendingStepDeclarations.Clear();
+        _pendingNodeDeclarations.Clear();
+        _pendingInitializations.Clear();
     }
 }
-
-internal sealed record StepExecutionRegistration(
-    StepId StepId,
-    Type ResultType,
-    IReadOnlyList<Type> DependencyResultTypes,
-    Func<StepInputs, IStepExecutionContext, ValueTask<object?>> Execute);

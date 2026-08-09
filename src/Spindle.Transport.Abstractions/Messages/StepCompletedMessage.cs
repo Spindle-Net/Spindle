@@ -7,7 +7,7 @@ public sealed record StepCompletedMessage
 {
     public required FlowInstanceId FlowInstanceId { get; init; }
 
-    public required StepId StepId { get; init; }
+    public required NodeId NodeId { get; init; }
 
     public required StepAttemptId AttemptId { get; init; }
 

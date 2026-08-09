@@ -10,6 +10,7 @@ internal sealed class FlowExecutor(
     FlowRegistry registry,
     ISpindleSerializer serializer,
     TimeProvider timeProvider,
+    BarrierProcessor barrierProcessor,
     StepHandlerRegistry stepHandlers,
     IServiceProvider services)
 {
@@ -31,7 +32,10 @@ internal sealed class FlowExecutor(
 
         var descriptor = registry.Resolve(instance.FlowName, instance.FlowVersion);
 
-        var steps = await store
+        await barrierProcessor.ProcessAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var nodes = await store
             .ExecuteAsync(
                 async (storeSession, storeCancellationToken) =>
                 {
@@ -43,14 +47,14 @@ internal sealed class FlowExecutor(
                             storeCancellationToken)
                         .ConfigureAwait(false);
 
-                    return await storeSession.Steps
+                    return await storeSession.Nodes
                         .GetByFlowInstanceAsync(instanceId, storeCancellationToken)
                         .ConfigureAwait(false);
                 },
                 cancellationToken)
             .ConfigureAwait(false);
 
-        session.BeginReplay(steps);
+        session.BeginReplay(nodes);
 
         try
         {
@@ -76,7 +80,7 @@ internal sealed class FlowExecutor(
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
                     {
-                        await FlushPendingStepDeclarationsAsync(session, storeSession, storeCancellationToken)
+                        await FlushPendingNodeDeclarationsAsync(session, storeSession, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.FlowInstances.MarkCompletedAsync(
@@ -95,7 +99,7 @@ internal sealed class FlowExecutor(
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
                     {
-                        await FlushPendingStepDeclarationsAsync(session, storeSession, storeCancellationToken)
+                        await FlushPendingNodeDeclarationsAsync(session, storeSession, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.FlowInstances.UpdateStatusAsync(
@@ -114,7 +118,7 @@ internal sealed class FlowExecutor(
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
                     {
-                        await FlushPendingStepDeclarationsAsync(session, storeSession, storeCancellationToken)
+                        await FlushPendingNodeDeclarationsAsync(session, storeSession, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.FlowInstances.MarkFailedAsync(
@@ -129,23 +133,38 @@ internal sealed class FlowExecutor(
         }
     }
 
-    private static async ValueTask FlushPendingStepDeclarationsAsync(
+    private static async ValueTask FlushPendingNodeDeclarationsAsync(
         FlowExecutionSession session,
         ISpindleStoreSession storeSession,
         CancellationToken cancellationToken)
     {
         using var activity = Telemetry.ActivitySource.StartActivity();
-        var pending = session.GetPendingStepDeclarations();
+        var pending = session.GetPendingNodeDeclarations();
 
         if (pending.Count == 0)
         {
             return;
         }
 
-        await storeSession.Steps
+        await storeSession.Nodes
             .CreateManyAsync(pending, cancellationToken)
             .ConfigureAwait(false);
 
-        session.MarkStepDeclarationsFlushed();
+        foreach (var initialization in session.GetPendingNodeInitializations())
+        {
+            switch (initialization)
+            {
+                case TimerNodeInitialization timer:
+                    await storeSession.Timers.CreateAsync(timer.Timer, cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
+                case SignalNodeInitialization signal:
+                    await storeSession.Signals.CreateWaitAsync(signal.SignalWait, cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
+            }
+        }
+
+        session.MarkNodeDeclarationsFlushed();
     }
 }

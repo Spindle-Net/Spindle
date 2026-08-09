@@ -10,7 +10,7 @@ public interface ITimerStore
 
     ValueTask<TimerRecord?> GetAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<TimerRecord>> GetDueAsync(
@@ -20,7 +20,7 @@ public interface ITimerStore
 
     ValueTask MarkFiredAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset firedAt,
         CancellationToken cancellationToken = default);
 }

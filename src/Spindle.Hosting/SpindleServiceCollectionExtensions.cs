@@ -1,6 +1,7 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Microsoft.Extensions.DependencyInjection;

@@ -5,7 +5,7 @@ using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Example.Observability;
 using Spindle.Persistence;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 
 namespace Spindle.Example.Hosting;
 

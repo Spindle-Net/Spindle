@@ -13,7 +13,7 @@ public sealed class UnitDummyFlow : ISpindleFlow<Unit, Unit>
             id: "dummy",
             name: "Dummy step",
             execute: () => ValueTask.FromResult(0));
-        await ctx.WaitAll(dummy);
+        await ctx.WaitAll("wait-all", "Wait for dummy step", dummy);
 
         return Unit.Value;
     }

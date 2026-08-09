@@ -7,7 +7,7 @@ public sealed record ExecutionHistoryRecord
 {
     public required FlowInstanceId FlowInstanceId { get; init; }
 
-    public StepId? StepId { get; init; }
+    public NodeId? NodeId { get; init; }
 
     public required string EventType { get; init; }
 

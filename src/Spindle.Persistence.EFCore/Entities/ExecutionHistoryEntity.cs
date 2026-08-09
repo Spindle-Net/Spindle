@@ -9,7 +9,7 @@ internal class ExecutionHistoryEntity
 
     public required string FlowInstanceId { get; init; }
 
-    public string? StepId { get; init; }
+    public string? NodeId { get; init; }
 
     public required string EventType { get; init; }
 

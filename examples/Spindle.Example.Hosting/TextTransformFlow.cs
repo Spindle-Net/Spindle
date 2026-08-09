@@ -1,5 +1,6 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle.Example.Hosting;
@@ -35,7 +36,7 @@ public sealed class TextTransformFlow : ISpindleFlow<TextTransformRequest, TextT
             name: "Generate camel-cased representation",
             execute: () => ValueTask.FromResult(ToCamelCase(request.Text)));
 
-        await ctx.WaitAll(upper, lower, camelCase);
+        await ctx.WaitAll("wait-all", "Wait for transformations", upper, lower, camelCase);
 
         var lastStep = ctx.Step("d1", "Dummy Starter",
             () => ValueTask.FromResult(0));

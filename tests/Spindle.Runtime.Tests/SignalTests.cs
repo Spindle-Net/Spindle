@@ -1,6 +1,7 @@
 ﻿using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using System;
 using System.Collections.Generic;
@@ -24,7 +25,7 @@ public class SignalTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.WaitForSignal(new SignalName("something"), new CorrelationKey(""));
+                await context.WaitForSignal("something", "Wait for something", new SignalName("something"), new CorrelationKey(""));
 
                 return new TestResult(1);
             });
@@ -35,16 +36,16 @@ public class SignalTests : TestBase
             options);
 
         var waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         var signalWaits = await store.Signals.GetOpenWaitsAsync(new SignalName("something"));
 
         Assert.NotNull(waitingInstance);
         Assert.Equal(FlowInstanceStatus.Waiting, waitingInstance.Status);
         var signalStep = Assert.Single(waitingSteps);
-        Assert.Equal(StepStatus.Waiting, signalStep.Status);
-        Assert.Equal(StepKind.SignalWait, signalStep.Kind);
+        Assert.Equal(NodeStatus.Waiting, signalStep.Status);
+        Assert.Equal(NodeKind.SignalWait, signalStep.Kind);
         var signalWait = Assert.Single(signalWaits);
-        Assert.Equal(signalStep.StepId, signalWait.StepId);
+        Assert.Equal(signalStep.NodeId, signalWait.NodeId);
         Assert.Equal(signalStep.FlowInstanceId, signalWait.FlowInstanceId);
         Assert.Equal(new SignalName("something"), signalWait.SignalName);
 
@@ -74,7 +75,7 @@ public class SignalTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.WaitForSignal(new SignalName("something"), new CorrelationKey("key"));
+                await context.WaitForSignal("key@something", "Wait for something", new SignalName("something"), new CorrelationKey("key"));
 
                 return new TestResult(1);
             });
@@ -85,16 +86,16 @@ public class SignalTests : TestBase
             options);
 
         var waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         var signalWaits = await store.Signals.GetOpenWaitsAsync(new SignalName("something"));
 
         Assert.NotNull(waitingInstance);
         Assert.Equal(FlowInstanceStatus.Waiting, waitingInstance.Status);
         var signalStep = Assert.Single(waitingSteps);
-        Assert.Equal(StepStatus.Waiting, signalStep.Status);
-        Assert.Equal(StepKind.SignalWait, signalStep.Kind);
+        Assert.Equal(NodeStatus.Waiting, signalStep.Status);
+        Assert.Equal(NodeKind.SignalWait, signalStep.Kind);
         var signalWait = Assert.Single(signalWaits);
-        Assert.Equal(signalStep.StepId, signalWait.StepId);
+        Assert.Equal(signalStep.NodeId, signalWait.NodeId);
         Assert.Equal(signalStep.FlowInstanceId, signalWait.FlowInstanceId);
         Assert.Equal(new SignalName("something"), signalWait.SignalName);
         Assert.Equal(new CorrelationKey("key"), signalWait.CorrelationKey);
@@ -108,12 +109,12 @@ public class SignalTests : TestBase
             options);
 
         waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         Assert.NotNull(waitingInstance);
         Assert.Equal(FlowInstanceStatus.Waiting, waitingInstance.Status);
         signalStep = Assert.Single(waitingSteps);
-        Assert.Equal(StepStatus.Waiting, signalStep.Status);
-        Assert.Equal(StepKind.SignalWait, signalStep.Kind);
+        Assert.Equal(NodeStatus.Waiting, signalStep.Status);
+        Assert.Equal(NodeKind.SignalWait, signalStep.Kind);
 
         await runtime.SignalAsync(new SignalName("something"), new CorrelationKey("key"));
 
@@ -140,8 +141,8 @@ public class SignalTests : TestBase
             flowName,
             async (context, _) =>
             {
-                var s1 = context.WaitForSignal(new SignalName("something"), new CorrelationKey("key1"));
-                var s2 = context.WaitForSignal(new SignalName("something"), new CorrelationKey("key2"));
+                var s1 = context.WaitForSignal("key1@something", "Wait for something (key1)", new SignalName("something"), new CorrelationKey("key1"));
+                var s2 = context.WaitForSignal("key2@something", "Wait for something (key2)", new SignalName("something"), new CorrelationKey("key2"));
                 await s1; // It will wake up and suspend on the next await after this
                 await s2;
 
@@ -154,7 +155,7 @@ public class SignalTests : TestBase
             options);
 
         var waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         var signalWaits = await store.Signals.GetOpenWaitsAsync(new SignalName("something"));
 
         Assert.NotNull(waitingInstance);
@@ -162,8 +163,8 @@ public class SignalTests : TestBase
         Assert.Equal(2, waitingSteps.Count);
         foreach (var signalStep in waitingSteps)
         {
-            Assert.Equal(StepStatus.Waiting, signalStep.Status);
-            Assert.Equal(StepKind.SignalWait, signalStep.Kind);
+            Assert.Equal(NodeStatus.Waiting, signalStep.Status);
+            Assert.Equal(NodeKind.SignalWait, signalStep.Kind);
         }
         Assert.Equal(2, signalWaits.Count);
         var first = signalWaits[0];
@@ -180,13 +181,13 @@ public class SignalTests : TestBase
             options);
 
         waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         signalWaits = await store.Signals.GetOpenWaitsAsync(new SignalName("something"));
         Assert.NotNull(waitingInstance);
         Assert.Equal(FlowInstanceStatus.Waiting, waitingInstance.Status);
         Assert.Equal(2, waitingSteps.Count);
-        Assert.Equal(StepStatus.Waiting, waitingSteps[0].Status);
-        Assert.Equal(StepStatus.Completed, waitingSteps[1].Status); // Here the second one should have completed
+        Assert.Equal(NodeStatus.Waiting, waitingSteps[0].Status);
+        Assert.Equal(NodeStatus.Completed, waitingSteps[1].Status); // Here the second one should have completed
         var signalWait = Assert.Single(signalWaits);
         Assert.Equal(new CorrelationKey("key1"), signalWait.CorrelationKey);
 
@@ -215,8 +216,8 @@ public class SignalTests : TestBase
             flowName,
             async (context, _) =>
             {
-                var s1 = context.WaitForSignal(new SignalName("something"), new CorrelationKey("key1"));
-                var s2 = context.WaitForSignal(new SignalName("something"), new CorrelationKey("key2"));
+                var s1 = context.WaitForSignal("key1@something", "Wait for something (key1)", new SignalName("something"), new CorrelationKey("key1"));
+                var s2 = context.WaitForSignal("key2@something", "Wait for something (key2)", new SignalName("something"), new CorrelationKey("key2"));
                 await s1; // It will wake up and suspend on the next await after this
                 await s2;
 
@@ -229,7 +230,7 @@ public class SignalTests : TestBase
             options);
 
         var waitingInstance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var waitingSteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var waitingSteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         var signalWaits = await store.Signals.GetOpenWaitsAsync(new SignalName("something"));
 
         Assert.NotNull(waitingInstance);
@@ -237,8 +238,8 @@ public class SignalTests : TestBase
         Assert.Equal(2, waitingSteps.Count);
         foreach (var signalStep in waitingSteps)
         {
-            Assert.Equal(StepStatus.Waiting, signalStep.Status);
-            Assert.Equal(StepKind.SignalWait, signalStep.Kind);
+            Assert.Equal(NodeStatus.Waiting, signalStep.Status);
+            Assert.Equal(NodeKind.SignalWait, signalStep.Kind);
         }
         Assert.Equal(2, signalWaits.Count);
         var first = signalWaits[0];
@@ -272,7 +273,7 @@ public class SignalTests : TestBase
             flowName,
             async (context, _) =>
             {
-                var data = await context.WaitForSignal<int>(new SignalName("something"), new CorrelationKey("data"));
+                var data = await context.WaitForSignal<int>("data@something", "Wait for data", new SignalName("something"), new CorrelationKey("data"));
 
                 return new TestResult(data * 2);
             });

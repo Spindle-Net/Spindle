@@ -34,7 +34,3 @@ public class TestBase
         return (runtime, store, serializer, clock);
     }
 }
-
-public sealed record TestRequest(int Value);
-
-public sealed record TestResult(int Value);

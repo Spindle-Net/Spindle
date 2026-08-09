@@ -1,6 +1,7 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
@@ -9,7 +10,7 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 using Spindle.Runtime.Tests.Stores;
 using Spindle.Testing;
@@ -61,13 +62,13 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             flowName,
             new TestRequest(0));
 
-        var steps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var steps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
         var step = Assert.Single(steps);
 
-        Assert.Equal(new StepId("a"), step.StepId);
+        Assert.Equal(new NodeId("a"), step.NodeId);
         Assert.Equal("A", step.Name);
-        Assert.Equal(StepKind.Step, step.Kind);
-        Assert.Equal(StepStatus.Ready, step.Status);
+        Assert.Equal(NodeKind.Step, step.Kind);
+        Assert.Equal(NodeStatus.Ready, step.Status);
         Assert.Empty(step.Dependencies);
     }
 
@@ -99,11 +100,11 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
         Assert.NotNull(handle);
 
         var instance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var step = Assert.Single(await store.Steps.GetByFlowInstanceAsync(handle.InstanceId));
+        var step = Assert.Single(await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId));
 
         Assert.NotNull(instance);
         Assert.Equal(FlowInstanceStatus.Waiting, instance.Status);
-        Assert.Equal(StepStatus.Ready, step.Status);
+        Assert.Equal(NodeStatus.Ready, step.Status);
     }
 
     [Fact]
@@ -131,10 +132,10 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             new TestRequest(0),
             options);
 
-        var step = Assert.Single(await store.Steps.GetByFlowInstanceAsync(handle.InstanceId));
+        var step = Assert.Single(await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId));
 
         Assert.Equal(new TestResult(42), result);
-        Assert.Equal(StepStatus.Completed, step.Status);
+        Assert.Equal(NodeStatus.Completed, step.Status);
         Assert.NotNull(step.Result);
         Assert.Equal(42, serializer.Deserialize<int>(step.Result));
     }
@@ -181,7 +182,7 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             {
                 var a = context.Step<int>("a", "A", () => ValueTask.FromResult(1));
                 var b = context.Step<int>("b", "B", () => ValueTask.FromResult(2));
-                await context.WaitAll(a, b);
+                await context.WaitAll("wait-all", "Wait for all", a, b);
                 return new TestResult(3);
             });
 
@@ -189,10 +190,15 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             flowName,
             new TestRequest(0));
 
-        var steps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var nodes = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
 
-        Assert.Equal(2, steps.Count);
-        Assert.All(steps, step => Assert.Equal(StepStatus.Ready, step.Status));
+        Assert.Equal(3, nodes.Count);
+        Assert.All(
+            nodes.Where(node => node.Kind == NodeKind.Step),
+            node => Assert.Equal(NodeStatus.Ready, node.Status));
+        Assert.Equal(
+            NodeStatus.Waiting,
+            nodes.Single(node => node.Kind == NodeKind.WaitAll).Status);
     }
 
     [Fact]
@@ -231,8 +237,8 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             new TestRequest(0),
             options);
 
-        var firstReplaySteps = await store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
-        Assert.Equal(StepStatus.Pending, firstReplaySteps.Single(step => step.StepId == new StepId("c")).Status);
+        var firstReplaySteps = await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
+        Assert.Equal(NodeStatus.Pending, firstReplaySteps.Single(step => step.NodeId == new NodeId("c")).Status);
 
         var result = await runtime.RunAsync<TestRequest, TestResult>(
             flowName,
@@ -273,10 +279,10 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
         var instance = await store.FlowInstances.GetByIdempotencyKeyAsync(flowName, options.IdempotencyKey!);
         Assert.NotNull(instance);
 
-        var step = Assert.Single(await store.Steps.GetByFlowInstanceAsync(instance.InstanceId));
+        var step = Assert.Single(await store.Nodes.GetByFlowInstanceAsync(instance.InstanceId));
 
         Assert.Contains("boom", exception.Message);
-        Assert.Equal(StepStatus.Failed, step.Status);
+        Assert.Equal(NodeStatus.Failed, step.Status);
         Assert.Contains("boom", step.Error);
         Assert.Equal(FlowInstanceStatus.Failed, instance.Status);
     }
@@ -326,7 +332,7 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
                         () => ValueTask.FromResult(index)))
                     .ToArray();
 
-                await context.WaitAll(steps);
+                await context.WaitAll("wait-all", "Wait for all", steps);
 
                 return new TestResult(steps.Length);
             });
@@ -335,11 +341,11 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             flowName,
             new TestRequest(0));
 
-        Assert.Equal(1, store.Steps.GetByFlowInstanceCalls);
-        Assert.Equal(0, store.Steps.GetAsyncCalls);
-        Assert.Equal(0, store.Steps.CreateCalls);
-        Assert.Equal(1, store.Steps.CreateManyCalls);
-        Assert.Equal(10, store.Steps.CreatedInBatches);
+        Assert.Equal(2, store.Nodes.GetByFlowInstanceCalls);
+        Assert.Equal(0, store.Nodes.GetAsyncCalls);
+        Assert.Equal(0, store.Nodes.CreateCalls);
+        Assert.Equal(1, store.Nodes.CreateManyCalls);
+        Assert.Equal(11, store.Nodes.CreatedInBatches);
     }
 
     [Fact]
@@ -368,7 +374,7 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             new TestRequest(0),
             options);
 
-        store.Steps.Reset();
+        store.Nodes.Reset();
 
         var result = await runtime.RunAsync<TestRequest, TestResult>(
             flowName,
@@ -376,8 +382,8 @@ public sealed class RuntimeSpindleRuntimeTests : TestBase
             options);
 
         Assert.Equal(new TestResult(42), result);
-        Assert.Equal(0, store.Steps.CreateCalls);
-        Assert.Equal(0, store.Steps.CreateManyCalls);
+        Assert.Equal(0, store.Nodes.CreateCalls);
+        Assert.Equal(0, store.Nodes.CreateManyCalls);
     }
 
 

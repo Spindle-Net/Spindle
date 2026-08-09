@@ -5,7 +5,7 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 using Spindle.Persistence.EFCore.Stores;
 
@@ -27,7 +27,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
 
     public IFlowInstanceStore FlowInstances => _rootSession.FlowInstances;
 
-    public IStepStore Steps => _rootSession.Steps;
+    public INodeStore Nodes => _rootSession.Nodes;
 
     public ITimerStore Timers => _rootSession.Timers;
 
@@ -87,7 +87,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
         {
             FlowDefinitions = new EFCoreFlowDefinitionStore(context);
             FlowInstances = new EFCoreFlowInstanceStore(context);
-            Steps = new EFCoreStepStore(context);
+            Nodes = new EFCoreNodeStore(context);
             Timers = new EFCoreTimerStore(context);
             Signals = new EFCoreSignalStore(context);
             Outbox = new EFCoreOutboxStore(context);
@@ -98,7 +98,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
 
         public IFlowDefinitionStore FlowDefinitions { get; }
         public IFlowInstanceStore FlowInstances { get; }
-        public IStepStore Steps { get; }
+        public INodeStore Nodes { get; }
         public ITimerStore Timers { get; }
         public ISignalStore Signals { get; }
         public IOutboxStore Outbox { get; }

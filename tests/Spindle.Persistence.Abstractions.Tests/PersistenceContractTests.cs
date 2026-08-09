@@ -1,8 +1,9 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence.FlowInstances;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Xunit;
 
 namespace Spindle.Persistence.Abstractions.Tests;
@@ -39,15 +40,15 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void StepInstanceRecord_DefaultsDependenciesToEmpty()
+    public void NodeInstanceRecord_DefaultsDependenciesToEmpty()
     {
-        var step = new StepInstanceRecord
+        var step = new NodeInstanceRecord
         {
             FlowInstanceId = new FlowInstanceId("instance-1"),
-            StepId = new StepId("step-1"),
+            NodeId = new NodeId("step-1"),
             Name = "Step 1",
-            Kind = StepKind.Step,
-            Status = StepStatus.Ready,
+            Kind = NodeKind.Step,
+            Status = NodeStatus.Ready,
             DispatchMode = StepDispatchMode.LocalWorker
         };
 
