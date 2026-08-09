@@ -7,7 +7,7 @@ public interface IStepExecutionContext
 {
     FlowInstanceId FlowInstanceId { get; }
 
-    StepId StepId { get; }
+    NodeId NodeId { get; }
 
     StepAttemptId AttemptId { get; }
 

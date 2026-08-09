@@ -10,7 +10,7 @@ public interface ILeaseStore
 
     ValueTask ReleaseStepLeaseAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         string owner,
         CancellationToken cancellationToken = default);
 }

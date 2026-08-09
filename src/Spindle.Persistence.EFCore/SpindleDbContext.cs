@@ -18,7 +18,7 @@ public sealed class SpindleDbContext(
     internal DbSet<SignalEntity> Signals => Set<SignalEntity>();
     internal DbSet<SignalWaitEntity> SignalWaits => Set<SignalWaitEntity>();
     internal DbSet<StepAttemptEntity> StepAttempts => Set<StepAttemptEntity>();
-    internal DbSet<StepInstanceEntity> StepInstances => Set<StepInstanceEntity>();
+    internal DbSet<NodeInstanceEntity> NodeInstances => Set<NodeInstanceEntity>();
     internal DbSet<StepLeaseEntity> StepLeases => Set<StepLeaseEntity>();
     internal DbSet<TimerEntity> Timers => Set<TimerEntity>();
 
@@ -119,11 +119,11 @@ public sealed class SpindleDbContext(
         modelBuilder.Entity<StepAttemptEntity>(entity =>
             entity.ToTable("StepAttempts"));
 
-        modelBuilder.Entity<StepDependencyEntity>(entity =>
+        modelBuilder.Entity<NodeDependencyEntity>(entity =>
         {
-            entity.HasOne(x => x.Step)
+            entity.HasOne(x => x.Node)
                 .WithMany(x => x.Dependencies)
-                .HasForeignKey(x => new { x.FlowInstanceId, x.StepId })
+                .HasForeignKey(x => new { x.FlowInstanceId, x.NodeId })
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(x => x.DependsOn)
@@ -132,9 +132,9 @@ public sealed class SpindleDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<StepInstanceEntity>(entity =>
+        modelBuilder.Entity<NodeInstanceEntity>(entity =>
         {
-            entity.ToTable("StepInstances");
+            entity.ToTable("NodeInstances");
 
             entity.OwnsOne(
                 owner => owner.Input,

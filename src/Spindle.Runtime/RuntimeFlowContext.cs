@@ -1,11 +1,12 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
-using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
+using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Waiting;
 using Spindle.Persistence;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 
 namespace Spindle;
@@ -29,38 +30,31 @@ internal sealed class RuntimeFlowContext(
 
     public CancellationToken CancellationToken => cancellationToken;
 
-    public Step<TResult> Step<TResult>(
+    public StepNode<TResult> Step<TResult>(
         string id,
         string name,
-        IReadOnlyList<Step> dependencies,
+        IReadOnlyList<Node> dependencies,
         StepCallback<TResult> execute,
         StepOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(dependencies);
         ArgumentNullException.ThrowIfNull(execute);
 
-        return DeclareStep(
-            id,
-            name,
-            StepKind.Step,
-            handlerId: null,
-            dependencies,
-            execute,
-            options);
+        return DeclareStepNode(id, name, handlerId: null, dependencies, execute, options);
     }
 
-    public Step<TResult> StepHandler<TRequest, TResult>(
+    public StepNode<TResult> StepHandler<TRequest, TResult>(
         string id,
         string name,
         StepHandlerId handlerId,
-        IReadOnlyList<Step> dependencies,
-        Func<StepInputs, TRequest> createRequest,
+        IReadOnlyList<Node> dependencies,
+        Func<NodeInputs, TRequest> createRequest,
         StepOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(dependencies);
         ArgumentNullException.ThrowIfNull(createRequest);
 
-        async ValueTask<TResult> Execute(StepInputs inputs, IStepExecutionContext context)
+        async ValueTask<TResult> Execute(NodeInputs inputs, IStepExecutionContext context)
         {
             var handler = stepHandlers.Resolve<TRequest, TResult>(handlerId, services)
                 ?? services.GetService(typeof(IStepHandler<TRequest, TResult>))
@@ -76,286 +70,297 @@ internal sealed class RuntimeFlowContext(
                 .ConfigureAwait(false);
         }
 
-        return DeclareStep(
-            id,
-            name,
-            StepKind.Step,
-            handlerId,
-            dependencies,
-            Execute,
-            options);
+        return DeclareStepNode(id, name, handlerId, dependencies, Execute, options);
     }
 
-    public async ValueTask WaitAll(params Step[] steps)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        foreach (var step in steps)
-        {
-            if (!session.TryGetStep(step.Id, out var record))
-            {
-                throw new FlowSuspendedException();
-            }
-
-            if (record.Status == StepStatus.Completed)
-            {
-                continue;
-            }
-
-            if (record.Status == StepStatus.Failed)
-            {
-                throw new InvalidOperationException(
-                    $"Step '{step.Id}' failed: {record.Error}");
-            }
-
-            throw new FlowSuspendedException();
-        }
-    }
-
-    public ValueTask Delay(
+    public WaitAllNode WaitAll(
         string id,
-        TimeSpan duration,
-        CancellationToken cancellationToken = default)
-    {
-        var dueAt = timeProvider.GetUtcNow().Add(duration);
-        return DelayUntil(id, dueAt, cancellationToken);
-    }
+        params Node[] nodes)
+        => WaitAll(id, id, BarrierCompletionMode.Terminal, nodes);
 
-    public async ValueTask DelayUntil(
-        string id,
-        DateTimeOffset dueAt,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var stepId = new StepId(id);
-
-        var step = await store.ExecuteAsync(
-                async (storeSession, storeCancellationToken) =>
-                {
-                    var timer = await storeSession.Timers
-                        .GetAsync(InstanceId, stepId, storeCancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (timer is null)
-                    {
-                        var now = timeProvider.GetUtcNow();
-
-                        await storeSession.Timers
-                            .CreateAsync(
-                                new TimerRecord
-                                {
-                                    FlowInstanceId = InstanceId,
-                                    StepId = stepId,
-                                    DueAt = dueAt,
-                                    CreatedAt = now
-                                },
-                                storeCancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (!session.TryGetStep(stepId, out _))
-                        {
-                            var timerStep = new StepInstanceRecord
-                            {
-                                FlowInstanceId = InstanceId,
-                                StepId = stepId,
-                                Name = id,
-                                Kind = StepKind.Timer,
-                                Status = StepStatus.Waiting,
-                                DispatchMode = StepDispatchMode.Immediate,
-                                CreatedAt = now,
-                                UpdatedAt = now
-                            };
-
-                            await storeSession.Steps
-                                .CreateAsync(timerStep, storeCancellationToken)
-                                .ConfigureAwait(false);
-
-                            return timerStep;
-                        }
-                    }
-
-                    return await storeSession.Steps
-                        .GetAsync(InstanceId, stepId, storeCancellationToken)
-                        .ConfigureAwait(false);
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (step is null)
-        {
-            if (!session.TryGetStep(stepId, out step))
-            {
-                throw new InvalidOperationException(
-                    $"Timer step '{stepId}' does not exist for flow instance '{InstanceId}'.");
-            }
-        }
-        else
-        {
-            session.UpsertStep(step);
-        }
-
-        if (step.Status == StepStatus.Completed)
-        {
-            return;
-        }
-
-        if (step.Status == StepStatus.Failed)
-        {
-            throw new InvalidOperationException($"Timer step '{stepId}' failed: {step.Error}");
-        }
-
-        throw new FlowSuspendedException();
-    }
-
-    public async ValueTask<TSignal?> WaitForSignal<TSignal>(
-        SignalName signalName,
-        CorrelationKey correlationKey,
-        SignalWaitOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var stepId = new StepId($"{correlationKey.Value}@{signalName.Value}");
-
-        var step = await store.ExecuteAsync(
-                async (storeSession, storeCancellationToken) =>
-                {
-                    if (session.TryGetStep(stepId, out var step))
-                    {
-                        return step!;
-                    }
-
-                    var now = timeProvider.GetUtcNow();
-
-                    await storeSession.Signals
-                        .CreateWaitAsync(
-                            new SignalWaitRecord
-                            {
-                                FlowInstanceId = InstanceId,
-                                StepId = stepId,
-                                SignalName = signalName,
-                                CorrelationKey = correlationKey,
-                                CreatedAt = now,
-                                ExpiresAt = options?.Timeout != null ? now.Add(options.Timeout.Value) : null,
-                            },
-                            storeCancellationToken)
-                        .ConfigureAwait(false);
-
-                    var newStep = new StepInstanceRecord
-                    {
-                        FlowInstanceId = session.FlowInstanceId,
-                        StepId = stepId,
-                        Kind = StepKind.SignalWait,
-                        Name = $"Wait for {signalName.Value} with correlation key {correlationKey.Value}",
-                        Status = StepStatus.Waiting,
-                        CreatedAt = now,
-                        UpdatedAt = now,
-                        DispatchMode = StepDispatchMode.Immediate,
-                    };
-
-                    await storeSession.Steps
-                        .CreateAsync(newStep, storeCancellationToken)
-                        .ConfigureAwait(false);
-
-                    return newStep;
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        session.UpsertStep(step);
-
-        if (step.Status == StepStatus.Completed)
-        {
-            if (step.Result == null) return default;
-            return serializer.Deserialize<TSignal>(step.Result);
-        }
-
-        if (step.Status == StepStatus.Failed)
-        {
-            throw new InvalidOperationException($"Signal step '{stepId}' failed: {step.Error}");
-        }
-
-        if (step.Status == StepStatus.TimedOut)
-        {
-            throw new TaskCanceledException();
-        }
-
-        throw new FlowSuspendedException();
-    }
-
-    private Step<TResult> DeclareStep<TResult>(
+    public WaitAllNode WaitAll(
         string id,
         string name,
-        StepKind kind,
+        params Node[] nodes)
+        => WaitAll(id, name, BarrierCompletionMode.Terminal, nodes);
+
+    public WaitAllNode WaitAll(
+        string id,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes)
+        => WaitAll(id, id, completionMode, nodes);
+
+    public WaitAllNode WaitAll(
+        string id,
+        string name,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes)
+    {
+        var inputs = ValidateBarrierInputs(nodes);
+        var nodeId = new NodeId(id);
+        var dependencyMode = completionMode == BarrierCompletionMode.Terminal
+            ? DependencySatisfactionMode.AllTerminal
+            : DependencySatisfactionMode.AllSucceeded;
+
+        DeclareBarrier(nodeId, name, NodeKind.WaitAll, inputs, dependencyMode);
+
+        return new RuntimeWaitAllNode(
+            CreateState<WaitAllResult>(nodeId, name, NodeKind.WaitAll),
+            inputs,
+            completionMode);
+    }
+
+    public WaitAnyNode WaitAny(
+        string id,
+        params Node[] nodes)
+        => WaitAny(id, id, BarrierCompletionMode.Terminal, nodes);
+
+    public WaitAnyNode WaitAny(
+        string id,
+        string name,
+        params Node[] nodes)
+        => WaitAny(id, name, BarrierCompletionMode.Terminal, nodes);
+
+    public WaitAnyNode WaitAny(
+        string id,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes)
+        => WaitAny(id, id, completionMode, nodes);
+
+    public WaitAnyNode WaitAny(
+        string id,
+        string name,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes)
+    {
+        var inputs = ValidateBarrierInputs(nodes);
+        var nodeId = new NodeId(id);
+        var dependencyMode = completionMode == BarrierCompletionMode.Terminal
+            ? DependencySatisfactionMode.AnyTerminal
+            : DependencySatisfactionMode.AnySucceeded;
+
+        DeclareBarrier(nodeId, name, NodeKind.WaitAny, inputs, dependencyMode);
+
+        return new RuntimeWaitAnyNode(
+            CreateState<WaitAnyResult>(nodeId, name, NodeKind.WaitAny),
+            inputs,
+            completionMode);
+    }
+
+    public DelayNode Delay(string id, TimeSpan duration)
+        => Delay(id, id, duration);
+
+    public DelayNode Delay(string id, string name, TimeSpan duration)
+    {
+        if (duration < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(duration));
+        }
+
+        return DelayUntil(id, name, timeProvider.GetUtcNow().Add(duration));
+    }
+
+    public DelayNode DelayUntil(string id, DateTimeOffset dueAt)
+        => DelayUntil(id, id, dueAt);
+
+    public DelayNode DelayUntil(string id, string name, DateTimeOffset dueAt)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var nodeId = new NodeId(id);
+        if (!session.TryGetNode(nodeId, out _))
+        {
+            var now = timeProvider.GetUtcNow();
+            session.TryDeclareNode(
+                new NodeInstanceRecord
+                {
+                    FlowInstanceId = InstanceId,
+                    NodeId = nodeId,
+                    Name = name,
+                    Kind = NodeKind.Timer,
+                    Status = NodeStatus.Waiting,
+                    DispatchMode = StepDispatchMode.Immediate,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                new TimerNodeInitialization(
+                    new TimerRecord
+                    {
+                        FlowInstanceId = InstanceId,
+                        NodeId = nodeId,
+                        DueAt = dueAt,
+                        CreatedAt = now
+                    }));
+        }
+
+        return new RuntimeDelayNode(CreateState<Unit>(nodeId, name, NodeKind.Timer));
+    }
+
+    public SignalNode<TSignal> WaitForSignal<TSignal>(
+        string id,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        SignalWaitOptions? options = null)
+        => WaitForSignal<TSignal>(id, id, signalName, correlationKey, options);
+
+    public SignalNode<TSignal> WaitForSignal<TSignal>(
+        string id,
+        string name,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        SignalWaitOptions? options = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var nodeId = new NodeId(id);
+        if (!session.TryGetNode(nodeId, out _))
+        {
+            var now = timeProvider.GetUtcNow();
+            session.TryDeclareNode(
+                new NodeInstanceRecord
+                {
+                    FlowInstanceId = InstanceId,
+                    NodeId = nodeId,
+                    Kind = NodeKind.SignalWait,
+                    Name = name,
+                    Status = NodeStatus.Waiting,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    DispatchMode = StepDispatchMode.Immediate
+                },
+                new SignalNodeInitialization(
+                    new SignalWaitRecord
+                    {
+                        FlowInstanceId = InstanceId,
+                        NodeId = nodeId,
+                        SignalName = signalName,
+                        CorrelationKey = correlationKey,
+                        CreatedAt = now,
+                        ExpiresAt = options?.Timeout is { } timeout ? now.Add(timeout) : null
+                    }));
+        }
+
+        return new RuntimeSignalNode<TSignal>(
+            CreateState<TSignal?>(nodeId, name, NodeKind.SignalWait),
+            signalName,
+            correlationKey);
+    }
+
+    private StepNode<TResult> DeclareStepNode<TResult>(
+        string id,
+        string name,
         StepHandlerId? handlerId,
-        IReadOnlyList<Step> dependencies,
+        IReadOnlyList<Node> dependencies,
         StepCallback<TResult> execute,
         StepOptions? options)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ValidateDependencies(dependencies);
 
-        var stepId = new StepId(id);
+        var nodeId = new NodeId(id);
         var stepOptions = options ?? new StepOptions();
         var dependencyIds = dependencies.Select(dependency => dependency.Id).ToArray();
-        var dependencyResultTypes = dependencies
-            .Select(GetDependencyResultType)
-            .ToArray();
+        var dependencyResultTypes = dependencies.Select(GetDependencyResultType).ToArray();
 
-        session.Register(stepId, dependencyResultTypes, execute);
+        session.Register(nodeId, dependencyResultTypes, execute);
 
-        if (!session.TryGetStep(stepId, out _))
+        if (!session.TryGetNode(nodeId, out _))
         {
             var now = timeProvider.GetUtcNow();
-            var status = DependenciesCompleted(dependencyIds)
-                ? StepStatus.Ready
-                : StepStatus.Pending;
+            var status = DependenciesSucceeded(dependencyIds)
+                ? NodeStatus.Ready
+                : NodeStatus.Pending;
 
-            session.TryDeclareStep(
-                new StepInstanceRecord
+            session.TryDeclareNode(
+                new NodeInstanceRecord
                 {
                     FlowInstanceId = InstanceId,
-                    StepId = stepId,
+                    NodeId = nodeId,
                     Name = name,
-                    Kind = kind,
+                    Kind = NodeKind.Step,
                     Status = status,
                     HandlerId = handlerId,
                     Queue = stepOptions.Queue,
                     DispatchMode = stepOptions.DispatchMode,
+                    DependencyMode = DependencySatisfactionMode.AllSucceeded,
                     Dependencies = dependencyIds,
                     CreatedAt = now,
                     UpdatedAt = now
                 });
         }
 
-        return new RuntimeStep<TResult>(
-            store,
-            session,
-            serializer,
-            InstanceId,
-            stepId,
-            name,
-            kind,
+        return new RuntimeStepNode<TResult>(
+            CreateState<TResult>(nodeId, name, NodeKind.Step),
             stepOptions);
     }
 
-    private bool DependenciesCompleted(
-        IReadOnlyList<StepId> dependencies)
+    private void DeclareBarrier(
+        NodeId nodeId,
+        string name,
+        NodeKind kind,
+        IReadOnlyList<Node> inputs,
+        DependencySatisfactionMode dependencyMode)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (session.TryGetNode(nodeId, out _))
+        {
+            return;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        session.TryDeclareNode(
+            new NodeInstanceRecord
+            {
+                FlowInstanceId = InstanceId,
+                NodeId = nodeId,
+                Name = name,
+                Kind = kind,
+                Status = NodeStatus.Waiting,
+                DispatchMode = StepDispatchMode.Immediate,
+                DependencyMode = dependencyMode,
+                Dependencies = inputs.Select(input => input.Id).ToArray(),
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+    }
+
+    private IReadOnlyList<Node> ValidateBarrierInputs(IReadOnlyList<Node> nodes)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+        if (nodes.Count == 0)
+        {
+            throw new ArgumentException("A wait barrier requires at least one input node.", nameof(nodes));
+        }
+
+        ValidateDependencies(nodes);
+        if (nodes.Select(node => node.Id).Distinct().Count() != nodes.Count)
+        {
+            throw new ArgumentException("A wait barrier cannot contain duplicate input nodes.", nameof(nodes));
+        }
+
+        return Array.AsReadOnly(nodes.ToArray());
+    }
+
+    private void ValidateDependencies(IReadOnlyList<Node> dependencies)
     {
         foreach (var dependency in dependencies)
         {
-            if (!session.TryGetStep(dependency, out var record) ||
-                record.Status != StepStatus.Completed)
+            if (dependency is not IRuntimeNode runtimeNode || runtimeNode.FlowInstanceId != InstanceId)
             {
-                return false;
+                throw new ArgumentException(
+                    $"Node '{dependency.Id}' does not belong to flow instance '{InstanceId}'.",
+                    nameof(dependencies));
             }
         }
-
-        return true;
     }
 
-    private static Type GetDependencyResultType(Step dependency)
-    {
-        return dependency is IRuntimeStep runtimeStep
-            ? runtimeStep.ResultType
-            : typeof(object);
-    }
+    private bool DependenciesSucceeded(IReadOnlyList<NodeId> dependencies)
+        => dependencies.All(dependency =>
+            session.TryGetNode(dependency, out var record) && record.Status == NodeStatus.Completed);
+
+    private static Type GetDependencyResultType(Node dependency)
+        => dependency is IRuntimeNode runtimeNode ? runtimeNode.ResultType : typeof(object);
+
+    private RuntimeNodeState<TResult> CreateState<TResult>(NodeId id, string name, NodeKind kind)
+        => new(store, session, serializer, InstanceId, id, name, kind);
 }

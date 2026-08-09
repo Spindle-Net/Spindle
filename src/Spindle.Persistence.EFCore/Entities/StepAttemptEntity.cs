@@ -7,7 +7,7 @@ internal class StepAttemptEntity
 {
     public required string FlowInstanceId { get; init; }
 
-    public required string StepId { get; init; }
+    public required string NodeId { get; init; }
 
     [Key]
     [MaxLength(255)]
@@ -17,7 +17,7 @@ internal class StepAttemptEntity
 
     public required string WorkerId { get; init; }
 
-    public required StepStatus Status { get; set; }
+    public required NodeStatus Status { get; set; }
 
     public required DateTimeOffset StartedAt { get; init; }
 

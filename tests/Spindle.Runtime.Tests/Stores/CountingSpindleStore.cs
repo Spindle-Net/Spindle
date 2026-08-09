@@ -5,7 +5,7 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 
 namespace Spindle.Runtime.Tests.Stores;
@@ -18,16 +18,16 @@ internal sealed class CountingSpindleStore : ISpindleStore
         ISpindleStore inner)
     {
         _inner = inner;
-        Steps = new CountingStepStore(inner.Steps);
+        Nodes = new CountingNodeStore(inner.Nodes);
     }
 
     public IFlowDefinitionStore FlowDefinitions => _inner.FlowDefinitions;
 
     public IFlowInstanceStore FlowInstances => _inner.FlowInstances;
 
-    public CountingStepStore Steps { get; }
+    public CountingNodeStore Nodes { get; }
 
-    IStepStore ISpindleStore.Steps => Steps;
+    INodeStore ISpindleStore.Nodes => Nodes;
 
     public ITimerStore Timers => _inner.Timers;
 
@@ -47,7 +47,7 @@ internal sealed class CountingSpindleStore : ISpindleStore
     {
         return _inner.ExecuteAsync(
             (session, storeCancellationToken) =>
-                operation(new CountingStoreSession(session, Steps), storeCancellationToken),
+                operation(new CountingStoreSession(session, Nodes), storeCancellationToken),
             cancellationToken);
     }
 }

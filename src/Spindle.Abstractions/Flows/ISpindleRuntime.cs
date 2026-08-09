@@ -114,7 +114,7 @@ public interface ISpindleRuntime
 
     ValueTask RetryAsync(
         FlowInstanceId instanceId,
-        StepId? stepId = null,
+        NodeId? nodeId = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<FlowInstanceSnapshot?> GetInstanceAsync(

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Hosting;
 using Spindle.Persistence;
@@ -30,11 +31,11 @@ public sealed class SqliteHostedWorkflowTests
 
         var snapshot = await application.WaitForTerminalStatusAsync(handle.InstanceId);
         var instance = await application.Store.FlowInstances.GetAsync(handle.InstanceId);
-        var steps = await application.Store.Steps.GetByFlowInstanceAsync(handle.InstanceId);
+        var steps = await application.Store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
 
         Assert.Equal(FlowInstanceStatus.Completed, snapshot.Status);
-        Assert.All(snapshot.Steps, step => Assert.Equal(StepStatus.Completed, step.Status));
-        Assert.Equal(3, snapshot.Steps.Count);
+        Assert.All(snapshot.Nodes, step => Assert.Equal(NodeStatus.Completed, step.Status));
+        Assert.Equal(3, snapshot.Nodes.Count);
         Assert.Equal(3, steps.Count);
         Assert.NotNull(instance?.Result);
         Assert.Equal(
@@ -63,7 +64,7 @@ public sealed class SqliteHostedWorkflowTests
             FlowInstanceStatus.Waiting);
         var pendingTimer = await application.Store.Timers.GetAsync(
             handle.InstanceId,
-            new StepId("delay"));
+            new NodeId("delay"));
 
         Assert.Equal(FlowInstanceStatus.Waiting, waiting.Status);
         Assert.NotNull(pendingTimer);
@@ -77,7 +78,7 @@ public sealed class SqliteHostedWorkflowTests
         var completed = await application.WaitForTerminalStatusAsync(handle.InstanceId);
         var firedTimer = await application.Store.Timers.GetAsync(
             handle.InstanceId,
-            new StepId("delay"));
+            new NodeId("delay"));
         var instance = await application.Store.FlowInstances.GetAsync(handle.InstanceId);
 
         Assert.Equal(FlowInstanceStatus.Completed, completed.Status);
@@ -102,10 +103,10 @@ public sealed class SqliteHostedWorkflowTests
         var snapshot = await application.WaitForTerminalStatusAsync(handle.InstanceId);
         var instance = await application.Store.FlowInstances.GetAsync(handle.InstanceId);
         var step = Assert.Single(
-            await application.Store.Steps.GetByFlowInstanceAsync(handle.InstanceId));
+            await application.Store.Nodes.GetByFlowInstanceAsync(handle.InstanceId));
 
         Assert.Equal(FlowInstanceStatus.Failed, snapshot.Status);
-        Assert.Equal(StepStatus.Failed, step.Status);
+        Assert.Equal(NodeStatus.Failed, step.Status);
         Assert.Contains("planned failure", step.Error);
         Assert.Contains("planned failure", instance?.Error);
         Assert.Null(instance?.Result);
@@ -162,7 +163,7 @@ public sealed class SqliteHostedWorkflowTests
             IFlowContext context,
             DelayedRequest request)
         {
-            await context.Delay("delay", TimeSpan.FromMinutes(5));
+            await context.Delay("delay", "Delay", TimeSpan.FromMinutes(5));
 
             return new DelayedResult($"{request.Value}-after-delay");
         }

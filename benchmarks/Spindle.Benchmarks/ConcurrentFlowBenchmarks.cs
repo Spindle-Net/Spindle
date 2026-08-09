@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Jobs;
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle.Benchmarks;
@@ -37,7 +38,7 @@ public class ConcurrentFlowBenchmarks : WorkflowBenchmarkBase
                 .Select(index => context.Step<int>($"task-{index:D4}", "Task", [], static (_, _) => ValueTask.FromResult(1)))
                 .ToArray();
 
-            await context.WaitAll([.. tasks]);
+            await context.WaitAll("wait-all", "Wait for all", [.. tasks]);
             return tasks.Length;
         };
     }

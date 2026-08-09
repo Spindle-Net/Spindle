@@ -1,4 +1,5 @@
 using Spindle.Abstractions.Core;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Abstractions.Waiting;
 
@@ -14,36 +15,89 @@ public interface IFlowContext
 
     CancellationToken CancellationToken { get; }
 
-    Step<TResult> Step<TResult>(
+    StepNode<TResult> Step<TResult>(
         string id,
         string name,
-        IReadOnlyList<Step> dependencies,
+        IReadOnlyList<Node> dependencies,
         StepCallback<TResult> execute,
         StepOptions? options = null);
 
-    Step<TResult> StepHandler<TRequest, TResult>(
+    StepNode<TResult> StepHandler<TRequest, TResult>(
         string id,
         string name,
         StepHandlerId handlerId,
-        IReadOnlyList<Step> dependencies,
-        Func<StepInputs, TRequest> createRequest,
+        IReadOnlyList<Node> dependencies,
+        Func<NodeInputs, TRequest> createRequest,
         StepOptions? options = null);
 
-    ValueTask WaitAll(params Step[] steps);
-
-    ValueTask Delay(
+    WaitAllNode WaitAll(
         string id,
-        TimeSpan duration,
-        CancellationToken cancellationToken = default);
+        params Node[] nodes);
 
-    ValueTask DelayUntil(
+    WaitAllNode WaitAll(
         string id,
-        DateTimeOffset dueAt,
-        CancellationToken cancellationToken = default);
+        string name,
+        params Node[] nodes);
 
-    ValueTask<TSignal?> WaitForSignal<TSignal>(
+    WaitAllNode WaitAll(
+        string id,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes);
+
+    WaitAllNode WaitAll(
+        string id,
+        string name,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes);
+
+    WaitAnyNode WaitAny(
+        string id,
+        params Node[] nodes);
+
+    WaitAnyNode WaitAny(
+        string id,
+        string name,
+        params Node[] nodes);
+
+    WaitAnyNode WaitAny(
+        string id,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes);
+
+    WaitAnyNode WaitAny(
+        string id,
+        string name,
+        BarrierCompletionMode completionMode,
+        params Node[] nodes);
+
+    DelayNode Delay(
+        string id,
+        TimeSpan duration);
+
+    DelayNode Delay(
+        string id,
+        string name,
+        TimeSpan duration);
+
+    DelayNode DelayUntil(
+        string id,
+        DateTimeOffset dueAt);
+
+    DelayNode DelayUntil(
+        string id,
+        string name,
+        DateTimeOffset dueAt);
+
+    SignalNode<TSignal> WaitForSignal<TSignal>(
+        string id,
+        string name,
         SignalName signalName,
         CorrelationKey correlationKey,
-        SignalWaitOptions? options = null,
-        CancellationToken cancellationToken = default);
+        SignalWaitOptions? options = null);
+
+    SignalNode<TSignal> WaitForSignal<TSignal>(
+        string id,
+        SignalName signalName,
+        CorrelationKey correlationKey,
+        SignalWaitOptions? options = null);
 }

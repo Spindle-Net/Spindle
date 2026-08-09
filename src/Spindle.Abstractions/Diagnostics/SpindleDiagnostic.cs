@@ -10,7 +10,7 @@ public sealed record SpindleDiagnostic
 
     public required SpindleDiagnosticSeverity Severity { get; init; }
 
-    public StepId? StepId { get; init; }
+    public NodeId? NodeId { get; init; }
 
     public string? HelpLink { get; init; }
 }

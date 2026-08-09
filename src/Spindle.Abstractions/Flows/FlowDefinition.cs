@@ -10,9 +10,9 @@ public sealed record FlowDefinition
 
     public required string DefinitionHash { get; init; }
 
-    public IReadOnlyList<StepDefinition> Steps { get; init; }
+    public IReadOnlyList<NodeDefinition> Nodes { get; init; }
         = [];
 
-    public IReadOnlyList<StepEdge> Edges { get; init; }
+    public IReadOnlyList<NodeEdge> Edges { get; init; }
         = [];
 }

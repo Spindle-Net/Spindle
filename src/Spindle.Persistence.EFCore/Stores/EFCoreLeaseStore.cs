@@ -16,13 +16,13 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
 
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
         activity?.SetTag("spindle.efcore.lease.flow-id", lease.FlowInstanceId.Value);
-        activity?.SetTag("spindle.efcore.lease.step-id", lease.StepId.Value);
+        activity?.SetTag("spindle.efcore.lease.step-id", lease.NodeId.Value);
         activity?.SetTag("spindle.efcore.lease.owner", lease.Owner);
 
         var updated = await context.StepLeases
             .Where(existing =>
                 existing.FlowInstanceId == lease.FlowInstanceId.Value &&
-                existing.StepId == lease.StepId.Value &&
+                existing.NodeId == lease.NodeId.Value &&
                 (existing.Owner == lease.Owner || existing.ExpiresAt <= lease.AcquiredAt))
             .ExecuteUpdateAsync(
                 update => update
@@ -39,7 +39,7 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
         if (await context.StepLeases.AnyAsync(
                 existing =>
                     existing.FlowInstanceId == lease.FlowInstanceId.Value &&
-                    existing.StepId == lease.StepId.Value,
+                    existing.NodeId == lease.NodeId.Value,
                 cancellationToken))
         {
             return false;
@@ -48,7 +48,7 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
         await context.StepLeases.AddAsync(new StepLeaseEntity
         {
             FlowInstanceId = lease.FlowInstanceId.Value,
-            StepId = lease.StepId.Value,
+            NodeId = lease.NodeId.Value,
             Owner = lease.Owner,
             AcquiredAt = lease.AcquiredAt,
             ExpiresAt = lease.ExpiresAt,
@@ -60,7 +60,7 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
 
     public async ValueTask ReleaseStepLeaseAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         string owner,
         CancellationToken cancellationToken = default)
     {
@@ -68,12 +68,12 @@ internal sealed class EFCoreLeaseStore(SpindleDbContext context) : ILeaseStore
 
         using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
         activity?.SetTag("spindle.efcore.lease.flow-id", flowInstanceId.Value);
-        activity?.SetTag("spindle.efcore.lease.step-id", stepId.Value);
+        activity?.SetTag("spindle.efcore.lease.step-id", nodeId.Value);
         activity?.SetTag("spindle.efcore.lease.owner", owner);
 
         await context.StepLeases.
             Where(x => x.FlowInstanceId == flowInstanceId.Value &&
-                       x.StepId == stepId.Value &&
+                       x.NodeId == nodeId.Value &&
                        x.Owner == owner
             ).ExecuteDeleteAsync(cancellationToken: cancellationToken);
     }

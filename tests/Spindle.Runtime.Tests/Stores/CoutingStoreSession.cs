@@ -5,21 +5,21 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 
 namespace Spindle.Runtime.Tests.Stores;
 
 internal sealed class CountingStoreSession(
         ISpindleStoreSession inner,
-        CountingStepStore steps)
+        CountingNodeStore steps)
         : ISpindleStoreSession
 {
     public IFlowDefinitionStore FlowDefinitions => inner.FlowDefinitions;
 
     public IFlowInstanceStore FlowInstances => inner.FlowInstances;
 
-    public IStepStore Steps => steps;
+    public INodeStore Nodes => steps;
 
     public ITimerStore Timers => inner.Timers;
 

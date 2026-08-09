@@ -1,9 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Runtime;
 using System.Diagnostics;
 
@@ -41,18 +42,21 @@ internal sealed class StepExecutor(
         mainActivity?.SetTag("spindle.worker-id", workerId);
 
         var executed = 0;
-        var attempted = new HashSet<StepId>();
+        var attempted = new HashSet<NodeId>();
         var steps = session
-            .GetStepsSnapshot()
-            .ToDictionary(step => step.StepId);
+            .GetNodesSnapshot()
+            .ToDictionary(step => step.NodeId);
 
         while (attempted.Count < maxCount)
         {
             var remaining = maxCount - attempted.Count;
             var readySteps = steps.Values
-                .Where(step => step.Status == StepStatus.Ready && !attempted.Contains(step.StepId))
+                .Where(step =>
+                    step.Kind == NodeKind.Step &&
+                    step.Status == NodeStatus.Ready &&
+                    !attempted.Contains(step.NodeId))
                 .OrderBy(step => step.CreatedAt)
-                .ThenBy(step => step.StepId.Value, StringComparer.Ordinal)
+                .ThenBy(step => step.NodeId.Value, StringComparer.Ordinal)
                 .Take(remaining)
                 .ToArray();
 
@@ -63,10 +67,10 @@ internal sealed class StepExecutor(
 
             foreach (var step in readySteps)
             {
-                attempted.Add(step.StepId);
+                attempted.Add(step.NodeId);
             }
 
-            var tasks = new List<Task<(StepInstanceRecord Step, StepExecutionResult Result)>>();
+            var tasks = new List<Task<(NodeInstanceRecord Step, StepExecutionResult Result)>>();
 
             foreach (var step in readySteps)
             {
@@ -91,24 +95,25 @@ internal sealed class StepExecutor(
 
                 if (!result.Completed)
                 {
-                    steps[step.StepId] = step with { Status = StepStatus.Failed };
-                    session.UpsertStep(steps[step.StepId]);
+                    steps[step.NodeId] = step with { Status = NodeStatus.Failed };
+                    session.UpsertNode(steps[step.NodeId]);
                     continue;
                 }
 
-                steps[step.StepId] = step with { Status = StepStatus.Completed };
-                session.UpsertStep(steps[step.StepId]);
+                steps[step.NodeId] = step with { Status = NodeStatus.Completed };
+                session.UpsertNode(steps[step.NodeId]);
 
                 foreach (var dependent in steps.Values
                              .Where(candidate =>
-                                 (candidate.Status is StepStatus.Pending or StepStatus.Waiting) &&
+                                 candidate.Kind == NodeKind.Step &&
+                                 candidate.Status == NodeStatus.Pending &&
                                  candidate.Dependencies.All(dependency =>
                                      steps.TryGetValue(dependency, out var prerequisite) &&
-                                     prerequisite.Status == StepStatus.Completed))
+                                     prerequisite.Status == NodeStatus.Completed))
                              .ToArray())
                 {
-                    steps[dependent.StepId] = dependent with { Status = StepStatus.Ready };
-                    session.UpsertStep(steps[dependent.StepId]);
+                    steps[dependent.NodeId] = dependent with { Status = NodeStatus.Ready };
+                    session.UpsertNode(steps[dependent.NodeId]);
                 }
             }
         }
@@ -116,13 +121,13 @@ internal sealed class StepExecutor(
         return executed;
     }
 
-    private async Task<(StepInstanceRecord Step, StepExecutionResult Result)> ExecuteStepAsync(
+    private async Task<(NodeInstanceRecord Step, StepExecutionResult Result)> ExecuteStepAsync(
         IStepExecutor executor,
         FlowExecutionSession session,
-        StepInstanceRecord step,
+        NodeInstanceRecord step,
         CancellationToken cancellationToken)
     {
-        using var activity = Telemetry.ActivitySource.StartActivity($"ExecuteStep - {step.StepId.Value}");
+        using var activity = Telemetry.ActivitySource.StartActivity($"ExecuteStep - {step.NodeId.Value}");
         try
         {
             return (step, await executor
@@ -133,8 +138,8 @@ internal sealed class StepExecutor(
         {
             logger?.LogError(
                 exception,
-                "Error executing step {StepId} for flow instance {FlowInstanceId}",
-                step.StepId,
+                "Error executing step {NodeId} for flow instance {FlowInstanceId}",
+                step.NodeId,
                 step.FlowInstanceId);
             return (step, StepExecutionResult.Failed);
         }

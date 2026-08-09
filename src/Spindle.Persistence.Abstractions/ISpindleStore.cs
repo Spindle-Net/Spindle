@@ -6,7 +6,7 @@ public interface ISpindleStore
 
     FlowInstances.IFlowInstanceStore FlowInstances { get; }
 
-    Steps.IStepStore Steps { get; }
+    Nodes.INodeStore Nodes { get; }
 
     Timers.ITimerStore Timers { get; }
 

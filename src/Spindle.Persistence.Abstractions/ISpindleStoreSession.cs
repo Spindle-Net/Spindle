@@ -3,8 +3,8 @@ using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
 using Spindle.Persistence.Timers;
 
 namespace Spindle.Persistence;
@@ -15,7 +15,7 @@ public interface ISpindleStoreSession
 
     IFlowInstanceStore FlowInstances { get; }
 
-    IStepStore Steps { get; }
+    INodeStore Nodes { get; }
 
     ITimerStore Timers { get; }
 

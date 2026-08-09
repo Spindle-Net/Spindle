@@ -5,7 +5,7 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 using Spindle.Persistence.InMemory.Stores;
 
@@ -25,7 +25,7 @@ public class InMemorySpindleStore : ISpindleStore
 
     public IFlowInstanceStore FlowInstances => _session.FlowInstances;
 
-    public IStepStore Steps => _session.Steps;
+    public INodeStore Nodes => _session.Nodes;
 
     public ITimerStore Timers => _session.Timers;
 
@@ -82,7 +82,7 @@ public class InMemorySpindleStore : ISpindleStore
         {
             FlowDefinitions = new InMemoryFlowDefinitionStore();
             FlowInstances = new InMemoryFlowInstanceStore();
-            Steps = new InMemoryStepStore();
+            Nodes = new InMemoryNodeStore();
             Timers = new InMemoryTimerStore();
             Signals = new InMemorySignalStore();
             Outbox = new InMemoryOutboxStore();
@@ -95,7 +95,7 @@ public class InMemorySpindleStore : ISpindleStore
 
         public IFlowInstanceStore FlowInstances { get; }
 
-        public IStepStore Steps { get; }
+        public INodeStore Nodes { get; }
 
         public ITimerStore Timers { get; }
 

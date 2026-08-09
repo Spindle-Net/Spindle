@@ -6,7 +6,7 @@ namespace Spindle.Persistence.InMemory.Stores;
 public sealed class InMemoryTimerStore : ITimerStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<(FlowInstanceId FlowInstanceId, StepId StepId), TimerRecord> _timers = [];
+    private readonly Dictionary<(FlowInstanceId FlowInstanceId, NodeId NodeId), TimerRecord> _timers = [];
 
     public ValueTask CreateAsync(
         TimerRecord timer,
@@ -16,7 +16,7 @@ public sealed class InMemoryTimerStore : ITimerStore
 
         lock (_gate)
         {
-            _timers[(timer.FlowInstanceId, timer.StepId)] = timer;
+            _timers[(timer.FlowInstanceId, timer.NodeId)] = timer;
         }
 
         return ValueTask.CompletedTask;
@@ -24,7 +24,7 @@ public sealed class InMemoryTimerStore : ITimerStore
 
     public ValueTask<TimerRecord?> GetAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -32,7 +32,7 @@ public sealed class InMemoryTimerStore : ITimerStore
         lock (_gate)
         {
             return ValueTask.FromResult(
-                _timers.TryGetValue((flowInstanceId, stepId), out var timer)
+                _timers.TryGetValue((flowInstanceId, nodeId), out var timer)
                     ? timer
                     : null);
         }
@@ -59,7 +59,7 @@ public sealed class InMemoryTimerStore : ITimerStore
 
     public ValueTask MarkFiredAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset firedAt,
         CancellationToken cancellationToken = default)
     {
@@ -67,7 +67,7 @@ public sealed class InMemoryTimerStore : ITimerStore
 
         lock (_gate)
         {
-            var key = (flowInstanceId, stepId);
+            var key = (flowInstanceId, nodeId);
             if (_timers.TryGetValue(key, out var timer))
             {
                 _timers[key] = timer with { FiredAt = firedAt };

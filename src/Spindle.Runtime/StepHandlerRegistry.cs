@@ -1,4 +1,5 @@
 using Spindle.Abstractions.Core;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle;

@@ -50,7 +50,7 @@ public sealed class EntityFrameworkPersistenceConcurrencyTests
                 .Select(index => new StepLeaseRecord
                 {
                     FlowInstanceId = new FlowInstanceId("concurrent-instance"),
-                    StepId = new StepId("concurrent-step"),
+                    NodeId = new NodeId("concurrent-step"),
                     Owner = $"worker-{index}",
                     AcquiredAt = now,
                     ExpiresAt = now.AddMinutes(1)
@@ -74,7 +74,7 @@ public sealed class EntityFrameworkPersistenceConcurrencyTests
             Assert.True(await store.Leases.TryAcquireStepLeaseAsync(new StepLeaseRecord
             {
                 FlowInstanceId = new FlowInstanceId("expired-instance"),
-                StepId = new StepId("expired-step"),
+                NodeId = new NodeId("expired-step"),
                 Owner = "expired-owner",
                 AcquiredAt = now.AddMinutes(-2),
                 ExpiresAt = now.AddMinutes(-1)
@@ -84,7 +84,7 @@ public sealed class EntityFrameworkPersistenceConcurrencyTests
                 .Select(index => new StepLeaseRecord
                 {
                     FlowInstanceId = new FlowInstanceId("expired-instance"),
-                    StepId = new StepId("expired-step"),
+                    NodeId = new NodeId("expired-step"),
                     Owner = $"worker-{index}",
                     AcquiredAt = now,
                     ExpiresAt = now.AddMinutes(1)

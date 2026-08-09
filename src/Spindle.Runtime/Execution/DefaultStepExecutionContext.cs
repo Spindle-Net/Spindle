@@ -1,12 +1,13 @@
 using Microsoft.Extensions.Logging;
 using Spindle.Abstractions.Core;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle;
 
 internal sealed class DefaultStepExecutionContext(
     FlowInstanceId flowInstanceId,
-    StepId stepId,
+    NodeId nodeId,
     StepAttemptId attemptId,
     int attempt,
     IServiceProvider services,
@@ -16,7 +17,7 @@ internal sealed class DefaultStepExecutionContext(
 {
     public FlowInstanceId FlowInstanceId => flowInstanceId;
 
-    public StepId StepId => stepId;
+    public NodeId NodeId => nodeId;
 
     public StepAttemptId AttemptId => attemptId;
 

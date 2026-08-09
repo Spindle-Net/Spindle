@@ -4,14 +4,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Spindle.Persistence.EFCore.Entities;
 
-[PrimaryKey(nameof(FlowInstanceId), nameof(StepId))]
+[PrimaryKey(nameof(FlowInstanceId), nameof(NodeId))]
 internal class StepLeaseEntity
 {
     [MaxLength(255)]
     public required string FlowInstanceId { get; init; }
 
     [MaxLength(255)]
-    public required string StepId { get; init; }
+    public required string NodeId { get; init; }
 
     public required string Owner { get; set; }
 

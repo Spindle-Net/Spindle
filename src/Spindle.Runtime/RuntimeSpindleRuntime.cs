@@ -7,7 +7,7 @@ using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Runtime;
 
 namespace Spindle;
@@ -47,6 +47,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             _registry,
             _serializer,
             _timeProvider,
+            new BarrierProcessor(_store, _serializer, _timeProvider),
             _stepHandlers,
             _services);
         _stepExecutor = new StepExecutor(
@@ -195,7 +196,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         CancellationToken cancellationToken = default)
     {
         var (handle, _) = await InternalQueueAsync<TRequest, TResult>(flowName, flowVersion, request, options, cancellationToken);
-        
+
         return handle;
     }
 
@@ -321,33 +322,33 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             continue;
                         }
 
-                        var step = await storeSession.Steps
-                            .GetAsync(timer.FlowInstanceId, timer.StepId, storeCancellationToken)
+                        var step = await storeSession.Nodes
+                            .GetAsync(timer.FlowInstanceId, timer.NodeId, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         if (step is null ||
-                            step.Status is StepStatus.Completed
-                                or StepStatus.Failed
-                                or StepStatus.Cancelled
-                                or StepStatus.TimedOut
-                                or StepStatus.Skipped)
+                            step.Status is NodeStatus.Completed
+                                or NodeStatus.Failed
+                                or NodeStatus.Cancelled
+                                or NodeStatus.TimedOut
+                                or NodeStatus.Skipped)
                         {
                             await storeSession.Timers
-                                .MarkFiredAsync(timer.FlowInstanceId, timer.StepId, now, storeCancellationToken)
+                                .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
                                 .ConfigureAwait(false);
                             continue;
                         }
 
-                        await storeSession.Steps
-                            .MarkCompletedAsync(timer.FlowInstanceId, timer.StepId, -1, result: null, now, storeCancellationToken)
+                        await storeSession.Nodes
+                            .MarkCompletedAsync(timer.FlowInstanceId, timer.NodeId, -1, result: null, now, storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.Timers
-                            .MarkFiredAsync(timer.FlowInstanceId, timer.StepId, now, storeCancellationToken)
+                            .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
                             .ConfigureAwait(false);
 
-                        await storeSession.Steps
-                            .MarkDependentsReadyAsync(timer.FlowInstanceId, [timer.StepId], _timeProvider.GetUtcNow(), storeCancellationToken)
+                        await storeSession.Nodes
+                            .MarkDependentsReadyAsync(timer.FlowInstanceId, [timer.NodeId], _timeProvider.GetUtcNow(), storeCancellationToken)
                             .ConfigureAwait(false);
 
                         fired++;
@@ -432,7 +433,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         }
 
         var session = new FlowExecutionSession(instanceId);
-        var beforeSteps = await _store.Steps
+        var beforeNodes = await _store.Nodes
             .GetByFlowInstanceAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -442,7 +443,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         var afterReplay = await _store.FlowInstances
             .GetAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);
-        var afterReplaySteps = await _store.Steps
+        var afterReplayNodes = await _store.Nodes
             .GetByFlowInstanceAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -471,7 +472,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
 
         var replayMadeProgress =
             before.Status != afterReplay?.Status ||
-            StepsChanged(beforeSteps, afterReplaySteps);
+            NodesChanged(beforeNodes, afterReplayNodes);
 
         return new RuntimeInstanceAdvanceResult(
             ReplayedFlows: replayMadeProgress ? 1 : 0,
@@ -513,22 +514,28 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
 
                     foreach (var wait in open)
                     {
-                        var step = await storeSession.Steps.GetAsync(wait.FlowInstanceId, wait.StepId, storeCancellationToken);
+                        var step = await storeSession.Nodes.GetAsync(wait.FlowInstanceId, wait.NodeId, storeCancellationToken);
                         // Don't set it to completed if the step is not waiting
                         // If the step is not waiting that means that the step proabaly is not expecting a signal
-                        if (step is { Status: StepStatus.Waiting })
+                        if (step is { Status: NodeStatus.Waiting })
                         {
-                            await storeSession.Steps.MarkCompletedAsync(
-                                wait.FlowInstanceId, 
-                                wait.StepId, 
-                                step.Attempt, 
-                                pl, 
-                                now, 
+                            await storeSession.Nodes.MarkCompletedAsync(
+                                wait.FlowInstanceId,
+                                wait.NodeId,
+                                step.Attempt,
+                                pl,
+                                now,
+                                storeCancellationToken);
+
+                            await storeSession.Nodes.MarkDependentsReadyAsync(
+                                wait.FlowInstanceId,
+                                [wait.NodeId],
+                                now,
                                 storeCancellationToken);
                         }
 
                         // Mark the wait as completed to clear it from the next run
-                        await storeSession.Signals.MarkWaitCompletedAsync(wait.FlowInstanceId, wait.StepId, now, storeCancellationToken);
+                        await storeSession.Signals.MarkWaitCompletedAsync(wait.FlowInstanceId, wait.NodeId, now, storeCancellationToken);
                     }
                 },
                 cancellationToken
@@ -541,7 +548,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         SignalName signalName,
         CorrelationKey correlationKey,
         TSignal payload,
-        CancellationToken cancellationToken = default) 
+        CancellationToken cancellationToken = default)
         => await InternalSignalAsync<TSignal>(instanceId, signalName, correlationKey, payload, cancellationToken);
 
     public async ValueTask SignalAsync<TSignal>(
@@ -583,7 +590,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
 
     public ValueTask RetryAsync(
         FlowInstanceId instanceId,
-        StepId? stepId = null,
+        NodeId? nodeId = null,
         CancellationToken cancellationToken = default)
     {
         throw new NotSupportedException("Retry is not supported by the local MVP runtime yet.");
@@ -602,7 +609,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             return null;
         }
 
-        var steps = await _store.Steps
+        var nodes = await _store.Nodes
             .GetByFlowInstanceAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);
 
@@ -614,18 +621,18 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             Status = instance.Status,
             CreatedAt = instance.CreatedAt,
             CompletedAt = instance.CompletedAt,
-            Steps = steps.Select(step => new StepSnapshot
+            Nodes = nodes.Select(node => new NodeSnapshot
             {
-                StepId = step.StepId,
-                Name = step.Name,
-                Kind = step.Kind,
-                Status = step.Status,
-                HandlerId = step.HandlerId,
-                Queue = step.Queue,
-                Attempt = step.Attempt,
-                StartedAt = step.StartedAt,
-                CompletedAt = step.CompletedAt,
-                LastError = step.Error
+                NodeId = node.NodeId,
+                Name = node.Name,
+                Kind = node.Kind,
+                Status = node.Status,
+                HandlerId = node.HandlerId,
+                Queue = node.Queue,
+                Attempt = node.Attempt,
+                StartedAt = node.StartedAt,
+                CompletedAt = node.CompletedAt,
+                LastError = node.Error
             }).ToArray()
         };
     }
@@ -638,9 +645,9 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             or FlowInstanceStatus.TimedOut;
     }
 
-    private static bool StepsChanged(
-        IReadOnlyList<StepInstanceRecord> before,
-        IReadOnlyList<StepInstanceRecord> after)
+    private static bool NodesChanged(
+        IReadOnlyList<NodeInstanceRecord> before,
+        IReadOnlyList<NodeInstanceRecord> after)
     {
         if (before.Count != after.Count)
         {
@@ -649,7 +656,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
 
         for (var i = 0; i < before.Count; i++)
         {
-            if (before[i].StepId != after[i].StepId ||
+            if (before[i].NodeId != after[i].NodeId ||
                 before[i].Status != after[i].Status ||
                 before[i].Attempt != after[i].Attempt ||
                 before[i].CompletedAt != after[i].CompletedAt ||
@@ -676,17 +683,4 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             left.TypeName == right.TypeName &&
             left.Data.SequenceEqual(right.Data);
     }
-}
-
-internal readonly record struct RuntimeInstanceAdvanceResult(
-    int ReplayedFlows,
-    int ExecutedSteps,
-    int CompletedFlows,
-    int FailedFlows)
-{
-    public static RuntimeInstanceAdvanceResult Empty { get; } = new(
-        ReplayedFlows: 0,
-        ExecutedSteps: 0,
-        CompletedFlows: 0,
-        FailedFlows: 0);
 }

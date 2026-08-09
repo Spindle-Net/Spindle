@@ -1,5 +1,8 @@
+using Spindle.Abstractions.Nodes;
+using Spindle.Abstractions.Steps;
+
 namespace Spindle.Abstractions.Steps;
 
 public delegate ValueTask<TResult> StepCallback<TResult>(
-    StepInputs inputs,
+    NodeInputs inputs,
     IStepExecutionContext context);

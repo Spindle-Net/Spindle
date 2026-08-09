@@ -15,7 +15,7 @@ public interface ISignalStore
 
     ValueTask MarkWaitCompletedAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default);
 

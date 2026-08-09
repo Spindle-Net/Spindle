@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.Leases;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Runtime;
 using System.Diagnostics;
 
@@ -24,10 +25,10 @@ internal sealed class LocalStepExecutor(
 
     public async Task<StepExecutionResult> ExecuteAsync(
         FlowExecutionSession session,
-        StepInstanceRecord step,
+        NodeInstanceRecord step,
         CancellationToken cancellationToken)
     {
-        if (!session.TryGet(step.StepId, out var registration))
+        if (!session.TryGet(step.NodeId, out var registration))
         {
             return StepExecutionResult.NotExecuted;
         }
@@ -38,9 +39,9 @@ internal sealed class LocalStepExecutor(
             await store
                 .ExecuteAsync(
                     (storeSession, storeCancellationToken) =>
-                        storeSession.Steps.MarkFailedAsync(
+                        storeSession.Nodes.MarkFailedAsync(
                             step.FlowInstanceId,
-                            step.StepId,
+                            step.NodeId,
                             step.Attempt,
                             "Queued step dispatch is not supported yet.",
                             timeProvider.GetUtcNow(),
@@ -57,9 +58,9 @@ internal sealed class LocalStepExecutor(
             await store
                 .ExecuteAsync(
                     (storeSession, storeCancellationToken) =>
-                        storeSession.Steps.MarkFailedAsync(
+                        storeSession.Nodes.MarkFailedAsync(
                             step.FlowInstanceId,
-                            step.StepId,
+                            step.NodeId,
                             step.Attempt,
                             $"Step dispatch mode '{step.DispatchMode}' is not supported by the local runtime.",
                             timeProvider.GetUtcNow(),
@@ -82,7 +83,7 @@ internal sealed class LocalStepExecutor(
                             new StepLeaseRecord
                             {
                                 FlowInstanceId = step.FlowInstanceId,
-                                StepId = step.StepId,
+                                NodeId = step.NodeId,
                                 Owner = workerId,
                                 AcquiredAt = leaseAcquiredAt,
                                 ExpiresAt = leaseAcquiredAt.Add(leaseDuration)
@@ -95,42 +96,42 @@ internal sealed class LocalStepExecutor(
                         return null;
                     }
 
-                    var current = await storeSession.Steps
-                        .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
+                    var current = await storeSession.Nodes
+                        .GetAsync(step.FlowInstanceId, step.NodeId, storeCancellationToken)
                         .ConfigureAwait(false)
                         ?? step;
 
-                    if (current.Status != StepStatus.Ready)
+                    if (current.Status != NodeStatus.Ready)
                     {
                         await storeSession.Leases
                             .ReleaseStepLeaseAsync(
                                 step.FlowInstanceId,
-                                step.StepId,
+                                step.NodeId,
                                 workerId,
                                 storeCancellationToken)
                             .ConfigureAwait(false);
                         return null;
                     }
 
-                    await storeSession.Steps
+                    await storeSession.Nodes
                         .MarkRunningAsync(
                             step.FlowInstanceId,
-                            step.StepId,
+                            step.NodeId,
                             attemptId,
                             workerId,
                             timeProvider.GetUtcNow(),
                             storeCancellationToken)
                         .ConfigureAwait(false);
 
-                    return await storeSession.Steps
-                        .GetAsync(step.FlowInstanceId, step.StepId, storeCancellationToken)
+                    return await storeSession.Nodes
+                        .GetAsync(step.FlowInstanceId, step.NodeId, storeCancellationToken)
                         .ConfigureAwait(false)
                         ?? step;
                 },
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (running is null || running.Status != StepStatus.Running)
+        if (running is null || running.Status != NodeStatus.Running)
         {
             return StepExecutionResult.NotExecuted;
         }
@@ -143,7 +144,7 @@ internal sealed class LocalStepExecutor(
             var stepLogger = new StepLogger(session, running, step, logger);
             var context = new DefaultStepExecutionContext(
                 step.FlowInstanceId,
-                step.StepId,
+                step.NodeId,
                 attemptId,
                 running.Attempt,
                 services,
@@ -155,7 +156,7 @@ internal sealed class LocalStepExecutor(
 
             // TODO: Make a difference of immediate and
             object? result;
-            using (var executeActivity = Telemetry.ActivitySource.StartActivity($"ExecuteStepCode - {step.StepId}"))
+            using (var executeActivity = Telemetry.ActivitySource.StartActivity($"ExecuteStepCode - {step.NodeId}"))
             {
                 result = await registration.Execute(inputs, context)
                     .ConfigureAwait(false);
@@ -166,28 +167,28 @@ internal sealed class LocalStepExecutor(
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
                     {
-                        await storeSession.Steps
+                        await storeSession.Nodes
                             .MarkCompletedAsync(
                                 step.FlowInstanceId,
-                                step.StepId,
+                                step.NodeId,
                                 step.Attempt,
                                 SerializerReflection.Serialize(serializer, result, registration.ResultType),
                                 timeProvider.GetUtcNow(),
                                 storeCancellationToken)
                             .ConfigureAwait(false);
 
-                        await storeSession.Steps
+                        await storeSession.Nodes
                             .MarkDependentsReadyAsync(
-                                step.FlowInstanceId, 
-                                [step.StepId], 
-                                timeProvider.GetUtcNow(), 
+                                step.FlowInstanceId,
+                                [step.NodeId],
+                                timeProvider.GetUtcNow(),
                                 storeCancellationToken)
                             .ConfigureAwait(false);
 
                         await storeSession.Leases
                             .ReleaseStepLeaseAsync(
                                 step.FlowInstanceId,
-                                step.StepId,
+                                step.NodeId,
                                 workerId,
                                 storeCancellationToken)
                             .ConfigureAwait(false);
@@ -196,7 +197,7 @@ internal sealed class LocalStepExecutor(
                 .ConfigureAwait(false);
             ConcurrencyHelper.ReleaseLock(step.FlowInstanceId);
 
-            session.SetResult(step.StepId, result);
+            session.SetResult(step.NodeId, result);
             activity?.SetStatus(ActivityStatusCode.Ok);
 
             return StepExecutionResult.Succeeded;
@@ -209,9 +210,9 @@ internal sealed class LocalStepExecutor(
                 await store
                     .ExecuteAsync(
                         (storeSession, storeCancellationToken) =>
-                            storeSession.Steps.MarkFailedAsync(
+                            storeSession.Nodes.MarkFailedAsync(
                                 step.FlowInstanceId,
-                                step.StepId,
+                                step.NodeId,
                                 step.Attempt,
                                 exception.Message,
                                 timeProvider.GetUtcNow(),
@@ -227,7 +228,7 @@ internal sealed class LocalStepExecutor(
                         (storeSession, storeCancellationToken) =>
                             storeSession.Leases.ReleaseStepLeaseAsync(
                                 step.FlowInstanceId,
-                                step.StepId,
+                                step.NodeId,
                                 workerId,
                                 storeCancellationToken),
                         CancellationToken.None)
@@ -240,9 +241,9 @@ internal sealed class LocalStepExecutor(
         return StepExecutionResult.Failed;
     }
 
-    private async ValueTask<StepInputs> BuildInputsAsync(
+    private async ValueTask<NodeInputs> BuildInputsAsync(
         FlowExecutionSession session,
-        Persistence.Steps.StepInstanceRecord step,
+        Persistence.Nodes.NodeInstanceRecord step,
         StepExecutionRegistration registration,
         CancellationToken cancellationToken)
     {
@@ -250,17 +251,19 @@ internal sealed class LocalStepExecutor(
 
         if (step.Dependencies.Count == 0)
         {
-            return new StepInputs(values);
+            return new NodeInputs(values);
         }
 
-        var missingDependencyIds = new List<StepId>();
+        var missingDependencyIds = new List<NodeId>();
 
         for (var i = 0; i < step.Dependencies.Count; i++)
         {
             var dependencyId = step.Dependencies[i];
             if (session.TryGetResult(dependencyId, out var cachedResult))
             {
-                values[i] = cachedResult;
+                values[i] = NormalizeDependencyResult(
+                    cachedResult,
+                    GetDependencyResultType(registration, i));
                 continue;
             }
 
@@ -269,14 +272,14 @@ internal sealed class LocalStepExecutor(
 
         if (missingDependencyIds.Count == 0)
         {
-            return new StepInputs(values);
+            return new NodeInputs(values);
         }
 
-        var dependencies = await store.Steps
+        var dependencies = await store.Nodes
             .GetManyAsync(step.FlowInstanceId, missingDependencyIds, cancellationToken)
             .ConfigureAwait(false);
         var dependenciesById = dependencies.ToDictionary(
-            dependency => dependency.StepId);
+            dependency => dependency.NodeId);
 
         for (var i = 0; i < step.Dependencies.Count; i++)
         {
@@ -289,24 +292,37 @@ internal sealed class LocalStepExecutor(
             if (!dependenciesById.TryGetValue(dependencyId, out var dependency))
             {
                 throw new InvalidOperationException(
-                    $"Dependency step '{dependencyId}' does not exist for step '{step.StepId}'.");
+                    $"Dependency step '{dependencyId}' does not exist for step '{step.NodeId}'.");
             }
 
-            if (dependency.Status != StepStatus.Completed)
+            if (dependency.Status != NodeStatus.Completed)
             {
                 throw new InvalidOperationException(
-                    $"Dependency step '{dependencyId}' is not completed for step '{step.StepId}'.");
+                    $"Dependency step '{dependencyId}' is not completed for step '{step.NodeId}'.");
             }
 
-            var dependencyType = i < registration.DependencyResultTypes.Count
-                ? registration.DependencyResultTypes[i]
-                : typeof(object);
+            var dependencyType = GetDependencyResultType(registration, i);
 
-            values[i] = dependency.Result is null
+            var result = dependency.Result is null
                 ? null
                 : serializer.Deserialize(dependency.Result, dependencyType);
+            values[i] = NormalizeDependencyResult(result, dependencyType);
         }
 
-        return new StepInputs(values);
+        return new NodeInputs(values);
     }
+
+    private static Type GetDependencyResultType(
+        StepExecutionRegistration registration,
+        int index)
+        => index < registration.DependencyResultTypes.Count
+            ? registration.DependencyResultTypes[index]
+            : typeof(object);
+
+    private static object? NormalizeDependencyResult(
+        object? result,
+        Type dependencyType)
+        => result is null && dependencyType == typeof(Unit)
+            ? Unit.Value
+            : result;
 }

@@ -6,10 +6,11 @@ using Spindle;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowInstances;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.EFCore;
 using Spindle.Persistence.EFCore.Sqlite;
 using Spindle.Persistence.InMemory;
@@ -86,7 +87,7 @@ public abstract class WorkflowBenchmarkBase : IDisposable
         await store.ExecuteAsync(
             async (session, cancellationToken) =>
             {
-                var steps = new List<StepInstanceRecord>(flowCount * stepCount);
+                var steps = new List<NodeInstanceRecord>(flowCount * stepCount);
                 for (var flowIndex = 0; flowIndex < flowCount; flowIndex++)
                 {
                     var instanceId = new FlowInstanceId($"seed-{flowIndex:D8}");
@@ -108,14 +109,14 @@ public abstract class WorkflowBenchmarkBase : IDisposable
 
                     for (var stepIndex = 0; stepIndex < stepCount; stepIndex++)
                     {
-                        steps.Add(new StepInstanceRecord
+                        steps.Add(new NodeInstanceRecord
                         {
                             FlowInstanceId = instanceId,
-                            StepId = new StepId($"step-{stepIndex:D4}"),
+                            NodeId = new NodeId($"step-{stepIndex:D4}"),
                             Name = "Step",
-                            Kind = StepKind.Step,
-                            Status = StepStatus.Completed,
-                            Dependencies = stepIndex == 0 ? [] : [new StepId($"step-{stepIndex - 1:D4}")],
+                            Kind = NodeKind.Step,
+                            Status = NodeStatus.Completed,
+                            Dependencies = stepIndex == 0 ? [] : [new NodeId($"step-{stepIndex - 1:D4}")],
                             Result = CreateSeedPayload(),
                             Attempt = 1,
                             StartedAt = now,
@@ -128,7 +129,7 @@ public abstract class WorkflowBenchmarkBase : IDisposable
 
                 if (steps.Count > 0)
                 {
-                    await session.Steps.CreateManyAsync(steps, cancellationToken);
+                    await session.Nodes.CreateManyAsync(steps, cancellationToken);
                 }
             });
     }

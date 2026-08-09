@@ -1,6 +1,7 @@
 ﻿using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Xunit;
 
@@ -20,7 +21,7 @@ public class DelaySpindleRuntimeTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.Delay("wait", TimeSpan.FromMinutes(5));
+                await context.Delay("wait", "Wait", TimeSpan.FromMinutes(5));
                 return new TestResult(1);
             });
 
@@ -29,17 +30,17 @@ public class DelaySpindleRuntimeTests : TestBase
             new TestRequest(0));
 
         var instance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var timer = await store.Timers.GetAsync(handle.InstanceId, new StepId("wait"));
-        var step = Assert.Single(await store.Steps.GetByFlowInstanceAsync(handle.InstanceId));
+        var timer = await store.Timers.GetAsync(handle.InstanceId, new NodeId("wait"));
+        var step = Assert.Single(await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId));
 
         Assert.NotNull(instance);
         Assert.Equal(FlowInstanceStatus.Waiting, instance.Status);
         Assert.NotNull(timer);
         Assert.Equal(initial.AddMinutes(5), timer.DueAt);
         Assert.Null(timer.FiredAt);
-        Assert.Equal(new StepId("wait"), step.StepId);
-        Assert.Equal(StepKind.Timer, step.Kind);
-        Assert.Equal(StepStatus.Waiting, step.Status);
+        Assert.Equal(new NodeId("wait"), step.NodeId);
+        Assert.Equal(NodeKind.Timer, step.Kind);
+        Assert.Equal(NodeStatus.Waiting, step.Status);
     }
 
     [Fact]
@@ -55,7 +56,7 @@ public class DelaySpindleRuntimeTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.Delay("wait", TimeSpan.FromMinutes(5));
+                await context.Delay("wait", "Wait", TimeSpan.FromMinutes(5));
                 return new TestResult(1);
             });
 
@@ -73,7 +74,7 @@ public class DelaySpindleRuntimeTests : TestBase
                     options)
                 .AsTask());
 
-        var timer = await store.Timers.GetAsync(handle.InstanceId, new StepId("wait"));
+        var timer = await store.Timers.GetAsync(handle.InstanceId, new NodeId("wait"));
 
         Assert.NotNull(timer);
         Assert.Equal(initial.AddMinutes(5), timer.DueAt);
@@ -93,7 +94,7 @@ public class DelaySpindleRuntimeTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.Delay("wait", TimeSpan.FromMinutes(5));
+                await context.Delay("wait", "Wait", TimeSpan.FromMinutes(5));
                 return new TestResult(42);
             });
 
@@ -110,15 +111,15 @@ public class DelaySpindleRuntimeTests : TestBase
             options);
 
         var instance = await store.FlowInstances.GetAsync(handle.InstanceId);
-        var timer = await store.Timers.GetAsync(handle.InstanceId, new StepId("wait"));
-        var step = Assert.Single(await store.Steps.GetByFlowInstanceAsync(handle.InstanceId));
+        var timer = await store.Timers.GetAsync(handle.InstanceId, new NodeId("wait"));
+        var step = Assert.Single(await store.Nodes.GetByFlowInstanceAsync(handle.InstanceId));
 
         Assert.Equal(new TestResult(42), result);
         Assert.NotNull(instance);
         Assert.Equal(FlowInstanceStatus.Completed, instance.Status);
         Assert.NotNull(timer);
         Assert.Equal(due, timer.FiredAt);
-        Assert.Equal(StepStatus.Completed, step.Status);
+        Assert.Equal(NodeStatus.Completed, step.Status);
         Assert.Equal(due, step.CompletedAt);
     }
 
@@ -134,7 +135,7 @@ public class DelaySpindleRuntimeTests : TestBase
             flowName,
             async (context, _) =>
             {
-                await context.DelayUntil("wait", due);
+                await context.DelayUntil("wait", "Wait", due);
                 return new TestResult(1);
             });
 
@@ -142,7 +143,7 @@ public class DelaySpindleRuntimeTests : TestBase
             flowName,
             new TestRequest(0));
 
-        var timer = await store.Timers.GetAsync(handle.InstanceId, new StepId("wait"));
+        var timer = await store.Timers.GetAsync(handle.InstanceId, new NodeId("wait"));
 
         Assert.NotNull(timer);
         Assert.Equal(due, timer.DueAt);

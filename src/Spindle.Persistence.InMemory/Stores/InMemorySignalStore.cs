@@ -6,7 +6,7 @@ namespace Spindle.Persistence.InMemory.Stores;
 public sealed class InMemorySignalStore : ISignalStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<(FlowInstanceId FlowInstanceId, StepId StepId), SignalWaitRecord> _waits = [];
+    private readonly Dictionary<(FlowInstanceId FlowInstanceId, NodeId NodeId), SignalWaitRecord> _waits = [];
     private readonly List<SignalRecord> _signals = [];
 
     public ValueTask CreateWaitAsync(
@@ -17,7 +17,7 @@ public sealed class InMemorySignalStore : ISignalStore
 
         lock (_gate)
         {
-            _waits[(wait.FlowInstanceId, wait.StepId)] = wait;
+            _waits[(wait.FlowInstanceId, wait.NodeId)] = wait;
         }
 
         return ValueTask.CompletedTask;
@@ -46,7 +46,7 @@ public sealed class InMemorySignalStore : ISignalStore
 
     public ValueTask MarkWaitCompletedAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default)
     {
@@ -54,7 +54,7 @@ public sealed class InMemorySignalStore : ISignalStore
 
         lock (_gate)
         {
-            var key = (flowInstanceId, stepId);
+            var key = (flowInstanceId, nodeId);
             if (_waits.TryGetValue(key, out var wait))
             {
                 _waits[key] = wait with { CompletedAt = completedAt };

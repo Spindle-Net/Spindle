@@ -7,7 +7,7 @@ using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Timers;
 
 namespace Spindle.Persistence.EFCore;
@@ -18,7 +18,7 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
     {
         FlowDefinitions = new FlowDefinitionStore(store);
         FlowInstances = new FlowInstanceStore(store);
-        Steps = new StepStore(store);
+        Nodes = new NodeStore(store);
         Timers = new TimerStore(store);
         Signals = new SignalStore(store);
         Outbox = new OutboxStore(store);
@@ -29,7 +29,7 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
     public IFlowDefinitionStore FlowDefinitions { get; }
     public IFlowInstanceStore FlowInstances { get; }
-    public IStepStore Steps { get; }
+    public INodeStore Nodes { get; }
     public ITimerStore Timers { get; }
     public ISignalStore Signals { get; }
     public IOutboxStore Outbox { get; }
@@ -73,43 +73,43 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
             store.ExecuteDirectAsync((session, token) => session.FlowInstances.MarkFailedAsync(instanceId, error, failedAt, token), cancellationToken);
     }
 
-    private sealed class StepStore(EFCoreSpindleStore store) : IStepStore
+    private sealed class NodeStore(EFCoreSpindleStore store) : INodeStore
     {
-        public ValueTask CreateAsync(StepInstanceRecord step, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.CreateAsync(step, token), cancellationToken);
+        public ValueTask CreateAsync(NodeInstanceRecord step, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.CreateAsync(step, token), cancellationToken);
 
-        public ValueTask CreateManyAsync(IReadOnlyList<StepInstanceRecord> steps, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.CreateManyAsync(steps, token), cancellationToken);
+        public ValueTask CreateManyAsync(IReadOnlyList<NodeInstanceRecord> steps, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.CreateManyAsync(steps, token), cancellationToken);
 
-        public ValueTask<StepInstanceRecord?> GetAsync(FlowInstanceId flowInstanceId, StepId stepId, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Steps.GetAsync(flowInstanceId, stepId, token), cancellationToken);
+        public ValueTask<NodeInstanceRecord?> GetAsync(FlowInstanceId flowInstanceId, NodeId nodeId, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.GetAsync(flowInstanceId, nodeId, token), cancellationToken);
 
-        public ValueTask<IReadOnlyList<StepInstanceRecord>> GetManyAsync(FlowInstanceId flowInstanceId, IReadOnlyList<StepId> stepIds, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Steps.GetManyAsync(flowInstanceId, stepIds, token), cancellationToken);
+        public ValueTask<IReadOnlyList<NodeInstanceRecord>> GetManyAsync(FlowInstanceId flowInstanceId, IReadOnlyList<NodeId> nodeIds, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.GetManyAsync(flowInstanceId, nodeIds, token), cancellationToken);
 
-        public ValueTask<IReadOnlyList<StepInstanceRecord>> GetByFlowInstanceAsync(FlowInstanceId flowInstanceId, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Steps.GetByFlowInstanceAsync(flowInstanceId, token), cancellationToken);
+        public ValueTask<IReadOnlyList<NodeInstanceRecord>> GetByFlowInstanceAsync(FlowInstanceId flowInstanceId, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.GetByFlowInstanceAsync(flowInstanceId, token), cancellationToken);
 
-        public ValueTask<IReadOnlyList<StepInstanceRecord>> GetReadyStepsAsync(int maxCount, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Steps.GetReadyStepsAsync(maxCount, token), cancellationToken);
+        public ValueTask<IReadOnlyList<NodeInstanceRecord>> GetReadyNodesAsync(int maxCount, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.GetReadyNodesAsync(maxCount, token), cancellationToken);
 
-        public ValueTask MarkReadyAsync(FlowInstanceId flowInstanceId, StepId stepId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkReadyAsync(flowInstanceId, stepId, updatedAt, token), cancellationToken);
+        public ValueTask MarkReadyAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkReadyAsync(flowInstanceId, nodeId, updatedAt, token), cancellationToken);
 
-        public ValueTask MarkRunningAsync(FlowInstanceId flowInstanceId, StepId stepId, StepAttemptId attemptId, string workerId, DateTimeOffset startedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkRunningAsync(flowInstanceId, stepId, attemptId, workerId, startedAt, token), cancellationToken);
+        public ValueTask MarkRunningAsync(FlowInstanceId flowInstanceId, NodeId nodeId, StepAttemptId attemptId, string workerId, DateTimeOffset startedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkRunningAsync(flowInstanceId, nodeId, attemptId, workerId, startedAt, token), cancellationToken);
 
-        public ValueTask MarkWaitingAsync(FlowInstanceId flowInstanceId, StepId stepId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkWaitingAsync(flowInstanceId, stepId, updatedAt, token), cancellationToken);
+        public ValueTask MarkWaitingAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkWaitingAsync(flowInstanceId, nodeId, updatedAt, token), cancellationToken);
 
-        public ValueTask MarkCompletedAsync(FlowInstanceId flowInstanceId, StepId stepId, int attempt, SerializedPayload? result, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkCompletedAsync(flowInstanceId, stepId, attempt, result, completedAt, token), cancellationToken);
+        public ValueTask MarkCompletedAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, SerializedPayload? result, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkCompletedAsync(flowInstanceId, nodeId, attempt, result, completedAt, token), cancellationToken);
 
-        public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, StepId stepId, int attempt, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkFailedAsync(flowInstanceId, stepId, attempt, error, failedAt, retryAt, token), cancellationToken);
+        public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkFailedAsync(flowInstanceId, nodeId, attempt, error, failedAt, retryAt, token), cancellationToken);
 
-        public ValueTask MarkDependentsReadyAsync(FlowInstanceId flowInstanceId, List<StepId>? updatedSteps, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Steps.MarkDependentsReadyAsync(flowInstanceId, updatedSteps, updatedAt, token), cancellationToken);
+        public ValueTask MarkDependentsReadyAsync(FlowInstanceId flowInstanceId, List<NodeId>? updatedNodes, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkDependentsReadyAsync(flowInstanceId, updatedNodes, updatedAt, token), cancellationToken);
     }
 
     private sealed class TimerStore(EFCoreSpindleStore store) : ITimerStore
@@ -117,14 +117,14 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
         public ValueTask CreateAsync(TimerRecord timer, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Timers.CreateAsync(timer, token), cancellationToken);
 
-        public ValueTask<TimerRecord?> GetAsync(FlowInstanceId flowInstanceId, StepId stepId, CancellationToken cancellationToken = default) =>
-            store.ExecuteAsync((session, token) => session.Timers.GetAsync(flowInstanceId, stepId, token), cancellationToken);
+        public ValueTask<TimerRecord?> GetAsync(FlowInstanceId flowInstanceId, NodeId nodeId, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Timers.GetAsync(flowInstanceId, nodeId, token), cancellationToken);
 
         public ValueTask<IReadOnlyList<TimerRecord>> GetDueAsync(DateTimeOffset dueAtOrBefore, int maxCount, CancellationToken cancellationToken = default) =>
             store.ExecuteAsync((session, token) => session.Timers.GetDueAsync(dueAtOrBefore, maxCount, token), cancellationToken);
 
-        public ValueTask MarkFiredAsync(FlowInstanceId flowInstanceId, StepId stepId, DateTimeOffset firedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Timers.MarkFiredAsync(flowInstanceId, stepId, firedAt, token), cancellationToken);
+        public ValueTask MarkFiredAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset firedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Timers.MarkFiredAsync(flowInstanceId, nodeId, firedAt, token), cancellationToken);
     }
 
     private sealed class SignalStore(EFCoreSpindleStore store) : ISignalStore
@@ -135,8 +135,8 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
         public ValueTask<IReadOnlyList<SignalWaitRecord>> GetOpenWaitsAsync(SignalName signalName, CorrelationKey? correlationKey = null, CancellationToken cancellationToken = default) =>
             store.ExecuteAsync((session, token) => session.Signals.GetOpenWaitsAsync(signalName, correlationKey, token), cancellationToken);
 
-        public ValueTask MarkWaitCompletedAsync(FlowInstanceId flowInstanceId, StepId stepId, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Signals.MarkWaitCompletedAsync(flowInstanceId, stepId, completedAt, token), cancellationToken);
+        public ValueTask MarkWaitCompletedAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Signals.MarkWaitCompletedAsync(flowInstanceId, nodeId, completedAt, token), cancellationToken);
 
         public ValueTask AppendSignalAsync(SignalRecord signal, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Signals.AppendSignalAsync(signal, token), cancellationToken);
@@ -205,8 +205,8 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
             }
         }
 
-        public ValueTask ReleaseStepLeaseAsync(FlowInstanceId flowInstanceId, StepId stepId, string owner, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Leases.ReleaseStepLeaseAsync(flowInstanceId, stepId, owner, token), cancellationToken);
+        public ValueTask ReleaseStepLeaseAsync(FlowInstanceId flowInstanceId, NodeId nodeId, string owner, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Leases.ReleaseStepLeaseAsync(flowInstanceId, nodeId, owner, token), cancellationToken);
 
         private ValueTask<bool> TryAcquireAsync(
             StepLeaseRecord lease,

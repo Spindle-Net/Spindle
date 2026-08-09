@@ -1,11 +1,12 @@
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle;
 
 public static class FlowContextStepExtensions
 {
-    public static Step<TResult> Step<TResult>(
+    public static StepNode<TResult> Step<TResult>(
         this IFlowContext context,
         string id,
         string name,
@@ -22,7 +23,7 @@ public static class FlowContextStepExtensions
             options);
     }
 
-    public static Step<TResult> Step<TResult>(
+    public static StepNode<TResult> Step<TResult>(
         this IFlowContext context,
         string id,
         string name,
@@ -39,11 +40,11 @@ public static class FlowContextStepExtensions
             options);
     }
 
-    public static Step<TResult> Step<T1, TResult>(
+    public static StepNode<TResult> Step<T1, TResult>(
         this IFlowContext context,
         string id,
         string name,
-        Step<T1> input1,
+        Node<T1> input1,
         Func<T1, ValueTask<TResult>> execute,
         StepOptions? options = null)
     {
@@ -57,11 +58,11 @@ public static class FlowContextStepExtensions
             options);
     }
 
-    public static Step<TResult> Step<T1, TResult>(
+    public static StepNode<TResult> Step<T1, TResult>(
         this IFlowContext context,
         string id,
         string name,
-        Step<T1> input1,
+        Node<T1> input1,
         Func<T1, IStepExecutionContext, ValueTask<TResult>> execute,
         StepOptions? options = null)
     {
@@ -75,12 +76,12 @@ public static class FlowContextStepExtensions
             options);
     }
 
-    public static Step<TResult> Step<T1, T2, TResult>(
+    public static StepNode<TResult> Step<T1, T2, TResult>(
         this IFlowContext context,
         string id,
         string name,
-        Step<T1> input1,
-        Step<T2> input2,
+        Node<T1> input1,
+        Node<T2> input2,
         Func<T1, T2, ValueTask<TResult>> execute,
         StepOptions? options = null)
     {
@@ -94,12 +95,12 @@ public static class FlowContextStepExtensions
             options);
     }
 
-    public static Step<TResult> Step<T1, T2, TResult>(
+    public static StepNode<TResult> Step<T1, T2, TResult>(
         this IFlowContext context,
         string id,
         string name,
-        Step<T1> input1,
-        Step<T2> input2,
+        Node<T1> input1,
+        Node<T2> input2,
         Func<T1, T2, IStepExecutionContext, ValueTask<TResult>> execute,
         StepOptions? options = null)
     {

@@ -1,5 +1,6 @@
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 
 namespace Spindle;
 
@@ -10,24 +11,7 @@ internal interface IStepExecutor
 
     public Task<StepExecutionResult> ExecuteAsync(
         FlowExecutionSession session,
-        StepInstanceRecord record,
+        NodeInstanceRecord record,
         CancellationToken cancellationToken);
 
-}
-
-internal readonly record struct StepExecutionResult(
-    bool Executed,
-    bool Completed)
-{
-    public static StepExecutionResult NotExecuted { get; } = new(
-        Executed: false,
-        Completed: false);
-
-    public static StepExecutionResult Failed { get; } = new(
-        Executed: true,
-        Completed: false);
-
-    public static StepExecutionResult Succeeded { get; } = new(
-        Executed: true,
-        Completed: true);
 }

@@ -17,7 +17,7 @@ internal sealed class EFCoreExecutionHistoryStore(SpindleDbContext context) : IE
         await context.ExecutionHistories.AddAsync(new Entities.ExecutionHistoryEntity
         {
             FlowInstanceId = record.FlowInstanceId.Value,
-            StepId = record.StepId?.Value,
+            NodeId = record.NodeId?.Value,
             EventType = record.EventType,
             Payload = record.Payload,
             CreatedAt = record.CreatedAt,
@@ -39,7 +39,7 @@ internal sealed class EFCoreExecutionHistoryStore(SpindleDbContext context) : IE
             .Select(x => new ExecutionHistoryRecord
             {
                 FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
-                StepId = x.StepId == null ? null : new StepId(x.StepId),
+                NodeId = x.NodeId == null ? null : new NodeId(x.NodeId),
                 EventType = x.EventType,
                 Payload = x.Payload,
                 CreatedAt = x.CreatedAt,

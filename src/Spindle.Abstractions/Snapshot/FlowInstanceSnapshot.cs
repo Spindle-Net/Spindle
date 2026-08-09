@@ -16,6 +16,6 @@ public sealed record FlowInstanceSnapshot
 
     public DateTimeOffset? CompletedAt { get; init; }
 
-    public IReadOnlyList<StepSnapshot> Steps { get; init; }
+    public IReadOnlyList<NodeSnapshot> Nodes { get; init; }
         = [];
 }

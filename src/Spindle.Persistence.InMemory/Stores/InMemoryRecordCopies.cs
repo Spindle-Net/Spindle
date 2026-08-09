@@ -4,7 +4,7 @@ using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Messaging;
 using Spindle.Persistence.Signals;
-using Spindle.Persistence.Steps;
+using Spindle.Persistence.Nodes;
 
 namespace Spindle.Persistence.InMemory.Stores;
 
@@ -31,7 +31,7 @@ internal static class InMemoryRecordCopies
         };
     }
 
-    public static StepInstanceRecord Copy(StepInstanceRecord record)
+    public static NodeInstanceRecord Copy(NodeInstanceRecord record)
     {
         return record with
         {

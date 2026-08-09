@@ -19,7 +19,7 @@ public sealed class TransportContractTests
             TargetApplication = new ApplicationName("app-b"),
             Queue = new QueueName("local"),
             FlowInstanceId = new FlowInstanceId("flow-1"),
-            StepId = new StepId("step-1"),
+            NodeId = new NodeId("step-1"),
             AttemptId = new StepAttemptId("attempt-1"),
             Payload = new SerializedPayload
             {
@@ -42,7 +42,7 @@ public sealed class TransportContractTests
         var message = new ExecuteStepMessage
         {
             FlowInstanceId = new FlowInstanceId("flow-1"),
-            StepId = new StepId("step-1"),
+            NodeId = new NodeId("step-1"),
             AttemptId = new StepAttemptId("attempt-1"),
             Attempt = 1,
             RequestedAt = requestedAt

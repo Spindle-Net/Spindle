@@ -18,7 +18,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
         await context.SignalWaits.AddAsync(new SignalWaitEntity
         {
             FlowInstanceId = wait.FlowInstanceId.Value,
-            StepId = wait.StepId.Value,
+            NodeId = wait.NodeId.Value,
             SignalName = wait.SignalName.Value,
             CorrelationKey = wait.CorrelationKey.Value,
             CreatedAt = wait.CreatedAt,
@@ -45,7 +45,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
             .Select(x => new SignalWaitRecord
             {
                 FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
-                StepId = new StepId(x.StepId),
+                NodeId = new NodeId(x.NodeId),
                 SignalName = new SignalName(x.SignalName),
                 CorrelationKey = new CorrelationKey(x.CorrelationKey),
                 CreatedAt = x.CreatedAt,
@@ -57,7 +57,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
 
     public async ValueTask MarkWaitCompletedAsync(
         FlowInstanceId flowInstanceId,
-        StepId stepId,
+        NodeId nodeId,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken = default)
     {
@@ -66,7 +66,7 @@ internal sealed class EFCoreSignalStore(SpindleDbContext context) : ISignalStore
 
         await context.SignalWaits
             .Where(x => x.FlowInstanceId == flowInstanceId.Value &&
-                        x.StepId == stepId.Value)
+                        x.NodeId == nodeId.Value)
             .ExecuteUpdateAsync(
                 x => x.SetProperty(y => y.CompletedAt, _ => completedAt),
                 cancellationToken: cancellationToken);
