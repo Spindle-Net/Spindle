@@ -103,6 +103,18 @@ public sealed class SpindleTestHarness
         return Pump.RunOnceAsync(cancellationToken);
     }
 
+    public async ValueTask<SpindlePumpResult> PumpAndWaitOnceAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await Pump.RunOnceAsync(cancellationToken);
+        if (result.ScheduledFlows == 0)
+            throw new InvalidOperationException("Pump did not schedule any flows");
+        if (!await Pump.WaitForWakeupAsync(timeout, cancellationToken))
+            throw new OperationCanceledException($"Scheduled pump did not finish within the specified timeout ({timeout.TotalSeconds} seconds)");
+        return result;
+    }
+
     public ValueTask<SpindlePumpResult> PumpUntilIdleAsync(
         int maxIterations = 100,
         CancellationToken cancellationToken = default)

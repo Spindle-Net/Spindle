@@ -76,6 +76,11 @@ internal sealed class FlowExecutor(
                     .ConfigureAwait(false);
             }
 
+            using (var descriptorActivity = Telemetry.ActivitySource.StartActivity("Await async descriptor initialization"))
+            {
+                await session.WaitForAsyncDescriptorInitializationTasks();
+            }
+
             await store
                 .ExecuteAsync(
                     async (storeSession, storeCancellationToken) =>
