@@ -193,12 +193,7 @@ public class ForkTests : TestBase
         Assert.Contains(waitingNodes, x => x.NodeId.Value == "fork1/test1");
         Assert.Contains(waitingNodes, x => x.NodeId.Value == "fork2/test1");
 
-        // This is a bit of a hack since it won't reliably run on only one pump
-        await harness.PumpUntilAsync(handle.InstanceId, async snapshot =>
-        {
-            var waitingNodes = await harness.Store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);
-            return waitingNodes.Count == 4;
-        }, maxIterations: 2);
+        await harness.PumpAndWaitOnceAsync(TimeSpan.FromSeconds(5));
 
         waitingInstance = await harness.Store.FlowInstances.GetAsync(handle.InstanceId);
         waitingNodes = await harness.Store.Nodes.GetByFlowInstanceAsync(handle.InstanceId);

@@ -103,44 +103,23 @@ public sealed class SpindleTestHarness
         return Pump.RunOnceAsync(cancellationToken);
     }
 
+    public async ValueTask<SpindlePumpResult> PumpAndWaitOnceAsync(
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await Pump.RunOnceAsync(cancellationToken);
+        if (result.ScheduledFlows == 0)
+            throw new InvalidOperationException("Pump did not schedule any flows");
+        if (!await Pump.WaitForWakeupAsync(timeout, cancellationToken))
+            throw new OperationCanceledException($"Scheduled pump did not finish within the specified timeout ({timeout.TotalSeconds} seconds)");
+        return result;
+    }
+
     public ValueTask<SpindlePumpResult> PumpUntilIdleAsync(
         int maxIterations = 100,
         CancellationToken cancellationToken = default)
     {
         return Pump.RunUntilIdleAsync(maxIterations, cancellationToken);
-    }
-
-
-    public async ValueTask<FlowInstanceSnapshot> PumpUntilAsync(
-        FlowInstanceId instanceId,
-        Func<FlowInstanceSnapshot, Task<bool>> predicate,
-        int maxIterations = 100,
-        CancellationToken cancellationToken = default)
-    {
-        for (var i = 0; i < maxIterations; i++)
-        {
-            var snapshot = await Runtime
-                .GetInstanceAsync(instanceId, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (snapshot != null && await predicate(snapshot))
-            {
-                return snapshot;
-            }
-
-            if (snapshot?.Status is FlowInstanceStatus.Failed or FlowInstanceStatus.Cancelled or FlowInstanceStatus.TimedOut)
-            {
-                throw new InvalidOperationException(
-                    $"Flow instance '{instanceId}' reached terminal status '{snapshot.Status}'.");
-            }
-
-            await PumpOnceAsync(cancellationToken).ConfigureAwait(false);
-            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        throw new TimeoutException(
-            $"Flow instance '{instanceId}' did not complete within {maxIterations} pump iterations.");
     }
 
     public async ValueTask<FlowInstanceSnapshot> PumpUntilCompletedAsync(
