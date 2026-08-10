@@ -13,6 +13,7 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
     private readonly Dictionary<NodeId, object?> _results = [];
     private readonly List<NodeId> _pendingNodeDeclarations = [];
     private readonly Dictionary<NodeId, NodeInitialization> _pendingInitializations = [];
+    private readonly List<Task> _descriptorInitializationTasks = [];
 
     public FlowInstanceId FlowInstanceId { get; } = flowInstanceId;
 
@@ -111,6 +112,22 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
             _pendingInitializations.Add(node.NodeId, initialization);
         }
         return true;
+    }
+
+    public void RegisterDescriptorAsyncInitialization(Task task)
+    {
+        _descriptorInitializationTasks.Add(task);
+    }
+
+    internal async Task WaitForAsyncDescriptorInitializationTasks()
+    {
+        foreach (var task in _descriptorInitializationTasks)
+        {
+            try
+            {
+                await task;
+            } catch (FlowSuspendedException) { } // Ignore FlowSuspendedExceptions as they should only be propagated when needed
+        }
     }
 
     public void UpsertNode(

@@ -35,5 +35,10 @@ public enum NodeKind
     /// <summary>
     /// A barrier that completes after one of its inputs satisfies its completion mode.
     /// </summary>
-    WaitAny
+    WaitAny,
+
+    /// <summary>
+    /// A fork node that namespaces its children and allows async/await inside of a segment of a flow.
+    /// </summary>
+    Fork,
 }

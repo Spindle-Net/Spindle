@@ -110,6 +110,39 @@ public sealed class SpindleTestHarness
         return Pump.RunUntilIdleAsync(maxIterations, cancellationToken);
     }
 
+
+    public async ValueTask<FlowInstanceSnapshot> PumpUntilAsync(
+        FlowInstanceId instanceId,
+        Func<FlowInstanceSnapshot, Task<bool>> predicate,
+        int maxIterations = 100,
+        CancellationToken cancellationToken = default)
+    {
+        for (var i = 0; i < maxIterations; i++)
+        {
+            var snapshot = await Runtime
+                .GetInstanceAsync(instanceId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (snapshot != null && await predicate(snapshot))
+            {
+                return snapshot;
+            }
+
+            if (snapshot?.Status is FlowInstanceStatus.Failed or FlowInstanceStatus.Cancelled or FlowInstanceStatus.TimedOut)
+            {
+                throw new InvalidOperationException(
+                    $"Flow instance '{instanceId}' reached terminal status '{snapshot.Status}'.");
+            }
+
+            await PumpOnceAsync(cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        throw new TimeoutException(
+            $"Flow instance '{instanceId}' did not complete within {maxIterations} pump iterations.");
+    }
+
     public async ValueTask<FlowInstanceSnapshot> PumpUntilCompletedAsync(
         FlowInstanceId instanceId,
         int maxIterations = 100,

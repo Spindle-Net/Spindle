@@ -8,6 +8,8 @@ using Spindle.Persistence;
 using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Signals;
 using Spindle.Persistence.Timers;
+using Spindle.Runtime.Nodes;
+using Spindle.Runtime;
 
 namespace Spindle;
 
@@ -244,6 +246,14 @@ internal sealed class RuntimeFlowContext(
             CreateState<TSignal?>(nodeId, name, NodeKind.SignalWait),
             signalName,
             correlationKey);
+    }
+
+    public ForkNode<TValue> Fork<TValue>(string id, Func<IFlowContext, Task<TValue>> descriptor)
+    {
+        var nsWrapper = new NamespacedFlowContextWrapper(id, this);
+        var task = descriptor(nsWrapper);
+        session.RegisterDescriptorAsyncInitialization(task);
+        return new RuntimeForkNode<TValue>(new NodeId(id), $"Fork {id}", task);
     }
 
     private StepNode<TResult> DeclareStepNode<TResult>(

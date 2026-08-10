@@ -100,4 +100,15 @@ public interface IFlowContext
         SignalName signalName,
         CorrelationKey correlationKey,
         SignalWaitOptions? options = null);
+
+    /// <summary>
+    /// Forks the execution into a namespace. This allows awaits inside the fork without affecting the entire flow.
+    /// </summary>
+    /// <typeparam name="TValue">The return type of the flow</typeparam>
+    /// <param name="id">The id / namespace of the flow</param>
+    /// <param name="descriptor">The flow descriptor function that builds the fork flow</param>
+    /// <returns>The fork node with it's return type</returns>
+    ForkNode<TValue> Fork<TValue>(
+        string id,
+        Func<IFlowContext, Task<TValue>> descriptor);
 }
