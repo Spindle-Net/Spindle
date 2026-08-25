@@ -11,7 +11,12 @@ internal sealed class MySqlDesignTimeDbContextFactory
     {
         var options = new DbContextOptionsBuilder<SpindleDbContext>()
             .UseMySQL("Server=localhost;Database=spindle;User=root;Password=spindle", mysql =>
-                mysql.MigrationsAssembly(typeof(MySqlDesignTimeDbContextFactory).Assembly.FullName))
+                mysql
+                    .MigrationsAssembly(typeof(MySqlDesignTimeDbContextFactory).Assembly.FullName)
+                    .EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromMilliseconds(100),
+                        errorNumbersToAdd: null))
             .Options;
 
         return new SpindleDbContext(options);

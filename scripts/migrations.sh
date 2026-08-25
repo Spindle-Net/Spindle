@@ -15,17 +15,20 @@ Usage:
   migrations.sh remove [provider|all] [--force]
   migrations.sh list [provider|all]
   migrations.sh check [provider|all]
+  migrations.sh script <provider|all> [from-migration] [to-migration]
 
 Providers:
   sqlite, postgresql (or postgres), mysql, sqlserver (or mssql), all
 
 Environment:
   SPINDLE_EF_FRAMEWORK  Target framework used by dotnet ef (default: net10.0)
+  SPINDLE_EF_SCHEMA     Optional schema for explicit PostgreSQL or SQL Server script validation
 
 Examples:
   ./scripts/migrations.sh add all AddFlowPriority
   ./scripts/migrations.sh check postgresql
   ./scripts/migrations.sh remove sqlite
+  ./scripts/migrations.sh script postgresql 0
 EOF
 }
 
@@ -47,9 +50,14 @@ run_for_provider() {
     local provider="$1"
     local command="$2"
     local argument="${3:-}"
+    local second_argument="${4:-}"
     local project="src/Spindle.Persistence.EFCore.${provider}/Spindle.Persistence.EFCore.${provider}.csproj"
 
-    printf '\n==> %s: %s\n' "$provider" "$command"
+    if [[ "$command" == "script" ]]; then
+        printf '\n==> %s: %s\n' "$provider" "$command" >&2
+    else
+        printf '\n==> %s: %s\n' "$provider" "$command"
+    fi
 
     case "$command" in
         add)
@@ -83,12 +91,29 @@ run_for_provider() {
                 --startup-project "$project" \
                 --framework "$framework"
             ;;
+        script)
+            local script_arguments=(migrations script)
+            if [[ -n "$argument" ]]; then
+                script_arguments+=("$argument")
+            fi
+            if [[ -n "$second_argument" ]]; then
+                script_arguments+=("$second_argument")
+            fi
+
+            dotnet ef "${script_arguments[@]}" \
+                --project "$project" \
+                --startup-project "$project" \
+                --framework "$framework" \
+                -- \
+                --spindle-ef-script
+            ;;
     esac
 }
 
 command="${1:-help}"
 requested_provider="${2:-all}"
 argument="${3:-}"
+second_argument="${4:-}"
 
 case "$command" in
     help|-h|--help)
@@ -109,7 +134,7 @@ case "$command" in
             exit 2
         fi
         ;;
-    list|check) ;;
+    list|check|script) ;;
     *)
         echo "Unknown command: $command" >&2
         usage >&2
@@ -117,12 +142,18 @@ case "$command" in
         ;;
 esac
 
+if [[ "$command" != "script" && -n "$second_argument" ]]; then
+    echo "The $command command accepts at most one argument." >&2
+    usage >&2
+    exit 2
+fi
+
 cd "$repository_root"
 
 if [[ "${requested_provider,,}" == "all" ]]; then
     for provider in Sqlite PostgreSQL MySql SqlServer; do
-        run_for_provider "$provider" "$command" "$argument"
+        run_for_provider "$provider" "$command" "$argument" "$second_argument"
     done
 else
-    run_for_provider "$(normalize_provider "$requested_provider")" "$command" "$argument"
+    run_for_provider "$(normalize_provider "$requested_provider")" "$command" "$argument" "$second_argument"
 fi

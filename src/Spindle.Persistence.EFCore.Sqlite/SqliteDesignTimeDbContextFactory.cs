@@ -11,7 +11,9 @@ internal sealed class SqliteDesignTimeDbContextFactory
     {
         var options = new DbContextOptionsBuilder<SpindleDbContext>()
             .UseSqlite("Data Source=spindle.db", sqlite =>
-                sqlite.MigrationsAssembly(typeof(SqliteDesignTimeDbContextFactory).Assembly.FullName))
+                sqlite
+                    .MigrationsAssembly(typeof(SqliteDesignTimeDbContextFactory).Assembly.FullName)
+                    .ExecutionStrategy(dependencies => new SqliteRetryingExecutionStrategy(dependencies)))
             .Options;
 
         return new SpindleDbContext(options);
