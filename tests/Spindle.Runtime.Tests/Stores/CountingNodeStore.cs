@@ -127,12 +127,22 @@ internal sealed class CountingNodeStore(
     public ValueTask MarkWaitingAsync(
         FlowInstanceId flowInstanceId,
         NodeId nodeId,
+        int attempt,
         DateTimeOffset updatedAt,
         CancellationToken cancellationToken = default)
     {
         MarkWaitingCalls++;
-        return inner.MarkWaitingAsync(flowInstanceId, nodeId, updatedAt, cancellationToken);
+        return inner.MarkWaitingAsync(flowInstanceId, nodeId, attempt, updatedAt, cancellationToken);
     }
+
+    public ValueTask MarkTimedOutAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        string error,
+        DateTimeOffset timedOutAt,
+        CancellationToken cancellationToken = default)
+        => inner.MarkTimedOutAsync(flowInstanceId, nodeId, attempt, error, timedOutAt, cancellationToken);
 
     public ValueTask MarkCompletedAsync(
         FlowInstanceId flowInstanceId,

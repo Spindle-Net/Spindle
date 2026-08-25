@@ -5,6 +5,7 @@ using Spindle.Abstractions.Steps;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Waiting;
 using Spindle.Persistence;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.Nodes;
 using Spindle.Persistence.Signals;
 using Spindle.Persistence.Timers;
@@ -246,6 +247,63 @@ internal sealed class RuntimeFlowContext(
             CreateState<TSignal?>(nodeId, name, NodeKind.SignalWait),
             signalName,
             correlationKey);
+    }
+
+    public ConditionNode WaitForCondition(
+        string id,
+        string name,
+        TimeSpan pollingInterval,
+        IReadOnlyList<Node> dependencies,
+        ConditionCallback condition)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(dependencies);
+        ArgumentNullException.ThrowIfNull(condition);
+        if (pollingInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollingInterval));
+        }
+
+        ValidateDependencies(dependencies);
+        var nodeId = new NodeId(id);
+        var dependencyIds = dependencies.Select(dependency => dependency.Id).ToArray();
+        var dependencyResultTypes = dependencies.Select(GetDependencyResultType).ToArray();
+        session.RegisterCondition(nodeId, dependencyResultTypes, condition);
+
+        if (!session.TryGetNode(nodeId, out _))
+        {
+            var now = timeProvider.GetUtcNow();
+            session.TryDeclareNode(
+                new NodeInstanceRecord
+                {
+                    FlowInstanceId = InstanceId,
+                    NodeId = nodeId,
+                    Name = name,
+                    Kind = NodeKind.ConditionWait,
+                    Status = DependenciesSucceeded(dependencyIds)
+                        ? NodeStatus.Ready
+                        : NodeStatus.Pending,
+                    DispatchMode = StepDispatchMode.LocalWorker,
+                    DependencyMode = DependencySatisfactionMode.AllSucceeded,
+                    Dependencies = dependencyIds,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                new ConditionNodeInitialization(
+                    new ConditionWaitRecord
+                    {
+                        FlowInstanceId = InstanceId,
+                        NodeId = nodeId,
+                        PollingInterval = pollingInterval,
+                        CreatedAt = now
+                    }));
+        }
+
+        return new RuntimeConditionNode(
+            CreateState<Unit>(nodeId, name, NodeKind.ConditionWait),
+            pollingInterval,
+            timeout: null,
+            timeout => session.TryConfigureConditionTimeout(nodeId, timeout));
     }
 
     public ForkNode<TValue> Fork<TValue>(string id, Func<IFlowContext, Task<TValue>> descriptor)

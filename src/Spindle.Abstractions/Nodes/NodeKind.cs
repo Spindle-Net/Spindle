@@ -41,4 +41,9 @@ public enum NodeKind
     /// A fork node that namespaces its children and allows async/await inside of a segment of a flow.
     /// </summary>
     Fork,
+
+    /// <summary>
+    /// A condition that is evaluated repeatedly until it succeeds or times out.
+    /// </summary>
+    ConditionWait,
 }

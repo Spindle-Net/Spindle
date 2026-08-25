@@ -167,6 +167,10 @@ internal sealed class FlowExecutor(
                     await storeSession.Signals.CreateWaitAsync(signal.SignalWait, cancellationToken)
                         .ConfigureAwait(false);
                     break;
+                case ConditionNodeInitialization condition:
+                    await storeSession.Conditions.CreateAsync(condition.ConditionWait, cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
             }
         }
 

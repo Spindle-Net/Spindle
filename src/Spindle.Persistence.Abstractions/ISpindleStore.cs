@@ -10,6 +10,8 @@ public interface ISpindleStore
 
     Timers.ITimerStore Timers { get; }
 
+    Conditions.IConditionWaitStore Conditions { get; }
+
     Signals.ISignalStore Signals { get; }
 
     Messaging.IOutboxStore Outbox { get; }

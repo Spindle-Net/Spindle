@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Spindle.Persistence.FlowDefinitions;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
@@ -30,6 +31,8 @@ public sealed class EFCoreSpindleStore : ISpindleStore
     public INodeStore Nodes => _rootSession.Nodes;
 
     public ITimerStore Timers => _rootSession.Timers;
+
+    public IConditionWaitStore Conditions => _rootSession.Conditions;
 
     public ISignalStore Signals => _rootSession.Signals;
 
@@ -89,6 +92,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
             FlowInstances = new EFCoreFlowInstanceStore(context);
             Nodes = new EFCoreNodeStore(context);
             Timers = new EFCoreTimerStore(context);
+            Conditions = new EFCoreConditionWaitStore(context);
             Signals = new EFCoreSignalStore(context);
             Outbox = new EFCoreOutboxStore(context);
             Inbox = new EFCoreInboxStore(context);
@@ -100,6 +104,7 @@ public sealed class EFCoreSpindleStore : ISpindleStore
         public IFlowInstanceStore FlowInstances { get; }
         public INodeStore Nodes { get; }
         public ITimerStore Timers { get; }
+        public IConditionWaitStore Conditions { get; }
         public ISignalStore Signals { get; }
         public IOutboxStore Outbox { get; }
         public IInboxStore Inbox { get; }

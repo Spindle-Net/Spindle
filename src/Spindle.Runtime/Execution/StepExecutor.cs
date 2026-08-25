@@ -52,7 +52,7 @@ internal sealed class StepExecutor(
             var remaining = maxCount - attempted.Count;
             var readySteps = steps.Values
                 .Where(step =>
-                    step.Kind == NodeKind.Step &&
+                    (step.Kind is NodeKind.Step or NodeKind.ConditionWait) &&
                     step.Status == NodeStatus.Ready &&
                     !attempted.Contains(step.NodeId))
                 .OrderBy(step => step.CreatedAt)
@@ -93,19 +93,17 @@ internal sealed class StepExecutor(
 
                 executed++;
 
-                if (!result.Completed)
+                steps[step.NodeId] = step with { Status = result.Status };
+                session.UpsertNode(steps[step.NodeId]);
+
+                if (result.Status != NodeStatus.Completed)
                 {
-                    steps[step.NodeId] = step with { Status = NodeStatus.Failed };
-                    session.UpsertNode(steps[step.NodeId]);
                     continue;
                 }
 
-                steps[step.NodeId] = step with { Status = NodeStatus.Completed };
-                session.UpsertNode(steps[step.NodeId]);
-
                 foreach (var dependent in steps.Values
                              .Where(candidate =>
-                                 candidate.Kind == NodeKind.Step &&
+                                 (candidate.Kind is NodeKind.Step or NodeKind.ConditionWait) &&
                                  candidate.Status == NodeStatus.Pending &&
                                  candidate.Dependencies.All(dependency =>
                                      steps.TryGetValue(dependency, out var prerequisite) &&

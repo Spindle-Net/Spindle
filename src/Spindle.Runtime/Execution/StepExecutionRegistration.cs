@@ -6,6 +6,7 @@ namespace Spindle;
 
 internal sealed record StepExecutionRegistration(
     NodeId NodeId,
+    NodeKind Kind,
     Type ResultType,
     IReadOnlyList<Type> DependencyResultTypes,
     Func<NodeInputs, IStepExecutionContext, ValueTask<object?>> Execute);

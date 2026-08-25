@@ -222,7 +222,11 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         if (currentStatus == null) throw new InvalidOperationException(
                 $"Node '{nodeId}' does not exist for flow instance '{flowInstanceId}'.");
 
-        var isTerminal = currentStatus is NodeStatus.Completed or NodeStatus.Failed or NodeStatus.Cancelled;
+        var isTerminal = currentStatus is NodeStatus.Completed
+            or NodeStatus.Failed
+            or NodeStatus.Cancelled
+            or NodeStatus.TimedOut
+            or NodeStatus.Skipped;
         if (isTerminal) return;
 
         // It does exist and is not terminal, so we can set it as ready
@@ -277,6 +281,7 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
     public async ValueTask MarkWaitingAsync(
         FlowInstanceId flowInstanceId,
         NodeId nodeId,
+        int attempt,
         DateTimeOffset updatedAt,
         CancellationToken cancellationToken = default)
     {
@@ -295,6 +300,52 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
                 .SetProperty(x => x.Status, _ => NodeStatus.Waiting)
                 .SetProperty(x => x.UpdatedAt, _ => updatedAt)
             , cancellationToken);
+
+        await CompleteAttemptAsync(
+            flowInstanceId,
+            nodeId,
+            attempt,
+            NodeStatus.Waiting,
+            updatedAt,
+            null,
+            cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async ValueTask MarkTimedOutAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        string error,
+        DateTimeOffset timedOutAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(x => x.Status, _ => NodeStatus.TimedOut)
+                .SetProperty(x => x.Error, _ => error)
+                .SetProperty(x => x.CompletedAt, _ => timedOutAt)
+                .SetProperty(x => x.UpdatedAt, _ => timedOutAt),
+                cancellationToken);
+
+        if (updated == 0)
+        {
+            throw new InvalidOperationException(
+                $"Node '{nodeId}' does not exist for flow instance '{flowInstanceId}'.");
+        }
+
+        await CompleteAttemptAsync(
+            flowInstanceId,
+            nodeId,
+            attempt,
+            NodeStatus.TimedOut,
+            timedOutAt,
+            error,
+            cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask MarkCompletedAsync(
@@ -368,7 +419,9 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
 
         var q = context.NodeInstances
                 .Where(x => x.FlowInstanceId == flowInstanceId.Value)
-                .Where(x => x.Kind == NodeKind.Step && x.Status == NodeStatus.Pending);
+                .Where(x =>
+                    (x.Kind == NodeKind.Step || x.Kind == NodeKind.ConditionWait) &&
+                    x.Status == NodeStatus.Pending);
 
         if (updatedNodes is { Count: > 0 })
         {
