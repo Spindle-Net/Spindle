@@ -221,7 +221,15 @@ internal sealed class LocalStepExecutor(
         }
         catch (Exception exception)
         {
-            activity?.AddException(exception);
+            activity?.AddEvent(
+                new ActivityEvent(
+                    "exception",
+                    tags: new ActivityTagsCollection
+                    {
+                        { "exception.type", exception.GetType().FullName },
+                        { "exception.message", exception.Message },
+                        { "exception.stacktrace", exception.ToString() },
+                    }));
             try
             {
                 await store

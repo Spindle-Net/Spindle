@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <BuildInParallel>false</BuildInParallel>
     <RestoreBuildInParallel>false</RestoreBuildInParallel>
+    <MicrosoftExtensionsVersion>8.0.0</MicrosoftExtensionsVersion>
+    <MicrosoftExtensionsVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.8</MicrosoftExtensionsVersion>
   </PropertyGroup>
 
   <PropertyGroup>
