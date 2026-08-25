@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.EFCore.Configuration;
@@ -10,6 +12,10 @@ public sealed class SpindleDbContext(
     DbContextOptions<SpindleDbContext> options)
     : DbContext(options)
 {
+    internal string? Schema => RelationalOptionsExtension
+        .Extract(this.GetService<IDbContextOptions>())
+        .MigrationsHistoryTableSchema;
+
     internal DbSet<ExecutionHistoryEntity> ExecutionHistories => Set<ExecutionHistoryEntity>();
     internal DbSet<ConditionWaitEntity> ConditionWaits => Set<ConditionWaitEntity>();
     internal DbSet<FlowDefinitionEntity> FlowDefinitions => Set<FlowDefinitionEntity>();
@@ -54,6 +60,11 @@ public sealed class SpindleDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        if (Schema is { Length: > 0 } schema)
+        {
+            modelBuilder.HasDefaultSchema(schema);
+        }
 
         modelBuilder.Entity<ExecutionHistoryEntity>(entity =>
         {

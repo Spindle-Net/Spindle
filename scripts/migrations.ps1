@@ -9,6 +9,9 @@ param(
     [Parameter(Position = 2)]
     [string] $Argument,
 
+    [Parameter(Position = 3)]
+    [string] $ToMigration,
+
     [switch] $Force,
 
     [Alias("h")]
@@ -33,17 +36,20 @@ Usage:
   ./scripts/migrations.ps1 remove [provider|all] [-Force]
   ./scripts/migrations.ps1 list [provider|all]
   ./scripts/migrations.ps1 check [provider|all]
+  ./scripts/migrations.ps1 script <provider|all> [from-migration] [to-migration]
 
 Providers:
   sqlite, postgresql (or postgres), mysql, sqlserver (or mssql), all
 
 Environment:
   SPINDLE_EF_FRAMEWORK  Target framework used by dotnet ef (default: net10.0)
+  SPINDLE_EF_SCHEMA     Optional schema for explicit PostgreSQL or SQL Server script validation
 
 Examples:
   ./scripts/migrations.ps1 add all AddFlowPriority
   ./scripts/migrations.ps1 check postgresql
   ./scripts/migrations.ps1 remove sqlite
+  ./scripts/migrations.ps1 script postgresql 0
 "@
 }
 
@@ -72,7 +78,8 @@ function Invoke-ProviderCommand {
     param(
         [string] $ProviderName,
         [string] $MigrationCommand,
-        [string] $CommandArgument
+        [string] $CommandArgument,
+        [string] $TargetMigration
     )
 
     $Project = "src/Spindle.Persistence.EFCore.$ProviderName/Spindle.Persistence.EFCore.$ProviderName.csproj"
@@ -105,6 +112,17 @@ function Invoke-ProviderCommand {
         "check" {
             Invoke-DotNetEf -Arguments (@("migrations", "has-pending-model-changes") + $CommonArguments)
         }
+        "script" {
+            $EfArguments = @("migrations", "script")
+            if ($CommandArgument) {
+                $EfArguments += $CommandArgument
+            }
+            if ($TargetMigration) {
+                $EfArguments += $TargetMigration
+            }
+
+            Invoke-DotNetEf -Arguments ($EfArguments + $CommonArguments + @("--", "--spindle-ef-script"))
+        }
     }
 }
 
@@ -130,8 +148,12 @@ switch ($Command) {
             throw "The remove command does not accept a positional argument; use -Force if needed."
         }
     }
-    { $_ -in "list", "check" } { }
+    { $_ -in "list", "check", "script" } { }
     default { throw "Unknown command: $Command" }
+}
+
+if ($Command -ne "script" -and $ToMigration) {
+    throw "The $Command command accepts at most one argument."
 }
 
 if ($Force -and $Command -ne "remove") {
@@ -149,7 +171,7 @@ try {
 
     foreach ($ProviderName in $Providers) {
         $CommandArgument = if ($Force) { "--force" } else { $Argument }
-        Invoke-ProviderCommand $ProviderName $Command $CommandArgument
+        Invoke-ProviderCommand $ProviderName $Command $CommandArgument $ToMigration
     }
 }
 finally {

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,7 +14,11 @@ public static class SpindleServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddPooledDbContextFactory<SpindleDbContext>(configure);
+        services.AddPooledDbContextFactory<SpindleDbContext>(options =>
+        {
+            options.ReplaceService<IModelCacheKeyFactory, SpindleModelCacheKeyFactory>();
+            configure(options);
+        });
         services.TryAddScoped<SpindleDbContext>(serviceProvider => serviceProvider
             .GetRequiredService<IDbContextFactory<SpindleDbContext>>()
             .CreateDbContext());
