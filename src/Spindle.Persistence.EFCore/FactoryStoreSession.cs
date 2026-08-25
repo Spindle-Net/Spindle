@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.FlowDefinitions;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
@@ -20,6 +21,7 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
         FlowInstances = new FlowInstanceStore(store);
         Nodes = new NodeStore(store);
         Timers = new TimerStore(store);
+        Conditions = new ConditionWaitStore(store);
         Signals = new SignalStore(store);
         Outbox = new OutboxStore(store);
         Inbox = new InboxStore(store);
@@ -31,6 +33,7 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
     public IFlowInstanceStore FlowInstances { get; }
     public INodeStore Nodes { get; }
     public ITimerStore Timers { get; }
+    public IConditionWaitStore Conditions { get; }
     public ISignalStore Signals { get; }
     public IOutboxStore Outbox { get; }
     public IInboxStore Inbox { get; }
@@ -99,8 +102,11 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
         public ValueTask MarkRunningAsync(FlowInstanceId flowInstanceId, NodeId nodeId, StepAttemptId attemptId, string workerId, DateTimeOffset startedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Nodes.MarkRunningAsync(flowInstanceId, nodeId, attemptId, workerId, startedAt, token), cancellationToken);
 
-        public ValueTask MarkWaitingAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
-            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkWaitingAsync(flowInstanceId, nodeId, updatedAt, token), cancellationToken);
+        public ValueTask MarkWaitingAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkWaitingAsync(flowInstanceId, nodeId, attempt, updatedAt, token), cancellationToken);
+
+        public ValueTask MarkTimedOutAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, string error, DateTimeOffset timedOutAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Nodes.MarkTimedOutAsync(flowInstanceId, nodeId, attempt, error, timedOutAt, token), cancellationToken);
 
         public ValueTask MarkCompletedAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, SerializedPayload? result, DateTimeOffset completedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Nodes.MarkCompletedAsync(flowInstanceId, nodeId, attempt, result, completedAt, token), cancellationToken);
@@ -125,6 +131,15 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
         public ValueTask MarkFiredAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset firedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Timers.MarkFiredAsync(flowInstanceId, nodeId, firedAt, token), cancellationToken);
+    }
+
+    private sealed class ConditionWaitStore(EFCoreSpindleStore store) : IConditionWaitStore
+    {
+        public ValueTask CreateAsync(ConditionWaitRecord wait, CancellationToken cancellationToken = default) =>
+            store.ExecuteDirectAsync((session, token) => session.Conditions.CreateAsync(wait, token), cancellationToken);
+
+        public ValueTask<ConditionWaitRecord?> GetAsync(FlowInstanceId flowInstanceId, NodeId nodeId, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Conditions.GetAsync(flowInstanceId, nodeId, token), cancellationToken);
     }
 
     private sealed class SignalStore(EFCoreSpindleStore store) : ISignalStore

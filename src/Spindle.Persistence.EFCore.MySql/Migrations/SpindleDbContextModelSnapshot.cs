@@ -19,6 +19,32 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                 .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", b =>
+                {
+                    b.Property<string>("FlowInstanceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("NodeId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ExpiresAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PollingIntervalTicks")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FlowInstanceId", "NodeId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("ConditionWaits", (string)null);
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -465,6 +491,15 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.HasIndex("FiredAt", "DueAt");
 
                     b.ToTable("Timers", (string)null);
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", b =>
+                {
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", null)
+                        .WithOne()
+                        .HasForeignKey("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", "FlowInstanceId", "NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>

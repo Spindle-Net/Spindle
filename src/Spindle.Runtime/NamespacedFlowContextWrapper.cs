@@ -74,4 +74,7 @@ internal class NamespacedFlowContextWrapper(string ns, IFlowContext parent) : IF
     public SignalNode<TSignal> WaitForSignal<TSignal>(string id, SignalName signalName, CorrelationKey correlationKey, SignalWaitOptions? options = null)
             => parent.WaitForSignal<TSignal>(WrapId(id), signalName, correlationKey, options);
 
+    public ConditionNode WaitForCondition(string id, string name, TimeSpan pollingInterval, IReadOnlyList<Node> dependencies, ConditionCallback condition)
+            => parent.WaitForCondition(WrapId(id), name, pollingInterval, dependencies, condition);
+
 }

@@ -14,6 +14,8 @@ It can also be used to only reference the abstractions without needing to includ
 - `DelayNode` represents a durable timer.
 - `SignalNode<TSignal>` represents a durable signal wait and exposes its signal
   name and correlation key.
+- `ConditionNode` represents a durable polling wait. It checks immediately once
+  its inputs are ready, then schedules another check after each false result.
 - `WaitAllNode` and `WaitAnyNode` are durable barriers whose results identify
   the terminal input outcomes or winning input node.
 
@@ -41,3 +43,30 @@ Barriers default to terminal-outcome semantics. Pass
 satisfy the barrier. `WaitAny` does not cancel inputs that did not win.
 When no display name is supplied, a node uses its explicit ID as its persisted
 name; explicit names remain available for operator-facing descriptions.
+
+## Waiting for a condition
+
+Use `WaitForCondition` when an external system cannot push a signal. Condition
+callbacks run locally and may consume zero, one, or two typed node inputs. A
+false result is not a failure: the node persists a timer and is checked again
+after the polling interval.
+
+```csharp
+var delivery = ctx.Step(
+    "delivery",
+    "Create delivery",
+    async () => await deliveryService.CreateAsync());
+
+await ctx.WaitForCondition(
+        "wait-for-delivery",
+        "Wait for delivery",
+        TimeSpan.FromMinutes(5),
+        delivery,
+        details => deliveryService.CheckIsDeliveredAsync(details.Id))
+    .WithTimeout(TimeSpan.FromDays(31));
+```
+
+Timeouts are measured from the node's original declaration and survive flow
+replay. A timed-out condition throws `TimeoutException` when awaited. Exceptions
+from the condition callback fail the node immediately; only a returned `false`
+schedules another poll.

@@ -23,6 +23,32 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", b =>
+                {
+                    b.Property<string>("FlowInstanceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("NodeId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("PollingIntervalTicks")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FlowInstanceId", "NodeId");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("ConditionWaits", (string)null);
+                });
+
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -474,6 +500,15 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.HasIndex("FiredAt", "DueAt");
 
                     b.ToTable("Timers", (string)null);
+                });
+
+            modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", b =>
+                {
+                    b.HasOne("Spindle.Persistence.EFCore.Entities.NodeInstanceEntity", null)
+                        .WithOne()
+                        .HasForeignKey("Spindle.Persistence.EFCore.Entities.ConditionWaitEntity", "FlowInstanceId", "NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Spindle.Persistence.EFCore.Entities.ExecutionHistoryEntity", b =>

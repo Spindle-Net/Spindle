@@ -46,7 +46,9 @@ internal sealed class RuntimeNodeState<TResult>(
                 : Serializer.Deserialize<TResult>(record.Result),
             NodeStatus.Failed => throw new InvalidOperationException(
                 $"Node '{Id}' failed: {record.Error}"),
-            NodeStatus.TimedOut or NodeStatus.Cancelled => throw new TaskCanceledException(),
+            NodeStatus.TimedOut => throw new TimeoutException(
+                $"Node '{Id}' timed out: {record.Error}"),
+            NodeStatus.Cancelled => throw new TaskCanceledException(),
             _ => throw new FlowSuspendedException()
         };
     }

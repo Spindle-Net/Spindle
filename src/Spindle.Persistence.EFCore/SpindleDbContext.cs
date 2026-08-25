@@ -11,6 +11,7 @@ public sealed class SpindleDbContext(
     : DbContext(options)
 {
     internal DbSet<ExecutionHistoryEntity> ExecutionHistories => Set<ExecutionHistoryEntity>();
+    internal DbSet<ConditionWaitEntity> ConditionWaits => Set<ConditionWaitEntity>();
     internal DbSet<FlowDefinitionEntity> FlowDefinitions => Set<FlowDefinitionEntity>();
     internal DbSet<FlowInstanceEntity> FlowInstances => Set<FlowInstanceEntity>();
     internal DbSet<InboxMessageEntity> InboxMessages => Set<InboxMessageEntity>();
@@ -60,6 +61,15 @@ public sealed class SpindleDbContext(
             entity.OwnsOne(
                 owner => owner.Payload,
                 payload => ConfigurePayload(payload, "Payload"));
+        });
+
+        modelBuilder.Entity<ConditionWaitEntity>(entity =>
+        {
+            entity.ToTable("ConditionWaits");
+            entity.HasOne<NodeInstanceEntity>()
+                .WithOne()
+                .HasForeignKey<ConditionWaitEntity>(wait => new { wait.FlowInstanceId, wait.NodeId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<FlowDefinitionEntity>(entity =>

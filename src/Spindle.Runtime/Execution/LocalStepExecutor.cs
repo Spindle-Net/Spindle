@@ -6,6 +6,7 @@ using Spindle.Abstractions.Steps;
 using Spindle.Persistence;
 using Spindle.Persistence.Leases;
 using Spindle.Persistence.Nodes;
+using Spindle.Persistence.Timers;
 using Spindle.Runtime;
 using System.Diagnostics;
 
@@ -162,6 +163,22 @@ internal sealed class LocalStepExecutor(
                     .ConfigureAwait(false);
             }
 
+            if (registration.Kind == NodeKind.ConditionWait)
+            {
+                if (result is not bool conditionSatisfied)
+                {
+                    throw new InvalidOperationException(
+                        $"Condition node '{step.NodeId}' did not return a Boolean result.");
+                }
+
+                return await CompleteConditionCheckAsync(
+                        session,
+                        running,
+                        conditionSatisfied,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             await ConcurrencyHelper.AquireLock(step.FlowInstanceId);
             await store
                 .ExecuteAsync(
@@ -171,7 +188,7 @@ internal sealed class LocalStepExecutor(
                             .MarkCompletedAsync(
                                 step.FlowInstanceId,
                                 step.NodeId,
-                                step.Attempt,
+                                running.Attempt,
                                 SerializerReflection.Serialize(serializer, result, registration.ResultType),
                                 timeProvider.GetUtcNow(),
                                 storeCancellationToken)
@@ -213,7 +230,7 @@ internal sealed class LocalStepExecutor(
                             storeSession.Nodes.MarkFailedAsync(
                                 step.FlowInstanceId,
                                 step.NodeId,
-                                step.Attempt,
+                                running.Attempt,
                                 exception.Message,
                                 timeProvider.GetUtcNow(),
                                 retryAt: null,
@@ -239,6 +256,118 @@ internal sealed class LocalStepExecutor(
         }
 
         return StepExecutionResult.Failed;
+    }
+
+    private async Task<StepExecutionResult> CompleteConditionCheckAsync(
+        FlowExecutionSession session,
+        NodeInstanceRecord condition,
+        bool satisfied,
+        CancellationToken cancellationToken)
+    {
+        var wait = await store.Conditions
+            .GetAsync(condition.FlowInstanceId, condition.NodeId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException(
+                $"Condition metadata for node '{condition.NodeId}' does not exist.");
+        var now = timeProvider.GetUtcNow();
+
+        if (wait.ExpiresAt is { } expiresAt && now >= expiresAt)
+        {
+            var error = $"Condition node '{condition.NodeId}' timed out at {expiresAt:O}.";
+            await store.ExecuteAsync(
+                    async (storeSession, storeCancellationToken) =>
+                    {
+                        await storeSession.Nodes.MarkTimedOutAsync(
+                                condition.FlowInstanceId,
+                                condition.NodeId,
+                                condition.Attempt,
+                                error,
+                                now,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                        await storeSession.Leases.ReleaseStepLeaseAsync(
+                                condition.FlowInstanceId,
+                                condition.NodeId,
+                                workerId,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return StepExecutionResult.TimedOut;
+        }
+
+        if (satisfied)
+        {
+            await store.ExecuteAsync(
+                    async (storeSession, storeCancellationToken) =>
+                    {
+                        await storeSession.Nodes.MarkCompletedAsync(
+                                condition.FlowInstanceId,
+                                condition.NodeId,
+                                condition.Attempt,
+                                result: null,
+                                now,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                        await storeSession.Nodes.MarkDependentsReadyAsync(
+                                condition.FlowInstanceId,
+                                [condition.NodeId],
+                                now,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                        await storeSession.Leases.ReleaseStepLeaseAsync(
+                                condition.FlowInstanceId,
+                                condition.NodeId,
+                                workerId,
+                                storeCancellationToken)
+                            .ConfigureAwait(false);
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            session.SetResult(condition.NodeId, Unit.Value);
+            return StepExecutionResult.Succeeded;
+        }
+
+        var dueAt = now.Add(wait.PollingInterval);
+        if (wait.ExpiresAt is { } deadline && deadline < dueAt)
+        {
+            dueAt = deadline;
+        }
+
+        await store.ExecuteAsync(
+                async (storeSession, storeCancellationToken) =>
+                {
+                    await storeSession.Nodes.MarkWaitingAsync(
+                            condition.FlowInstanceId,
+                            condition.NodeId,
+                            condition.Attempt,
+                            now,
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+                    await storeSession.Timers.CreateAsync(
+                            new TimerRecord
+                            {
+                                FlowInstanceId = condition.FlowInstanceId,
+                                NodeId = condition.NodeId,
+                                DueAt = dueAt,
+                                CreatedAt = now
+                            },
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+                    await storeSession.Leases.ReleaseStepLeaseAsync(
+                            condition.FlowInstanceId,
+                            condition.NodeId,
+                            workerId,
+                            storeCancellationToken)
+                        .ConfigureAwait(false);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return StepExecutionResult.Waiting;
     }
 
     private async ValueTask<NodeInputs> BuildInputsAsync(

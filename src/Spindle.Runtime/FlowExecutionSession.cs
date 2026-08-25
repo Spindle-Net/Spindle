@@ -2,6 +2,7 @@ using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
+using Spindle.Abstractions.Waiting;
 using Spindle.Persistence.Nodes;
 
 namespace Spindle;
@@ -49,7 +50,26 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
 
         _registrations[nodeId] = new StepExecutionRegistration(
             nodeId,
+            NodeKind.Step,
             typeof(TResult),
+            dependencyResultTypes.ToArray(),
+            Execute);
+    }
+
+    public void RegisterCondition(
+        NodeId nodeId,
+        IReadOnlyList<Type> dependencyResultTypes,
+        ConditionCallback callback)
+    {
+        async ValueTask<object?> Execute(NodeInputs inputs, IStepExecutionContext context)
+        {
+            return await callback(inputs, context).ConfigureAwait(false);
+        }
+
+        _registrations[nodeId] = new StepExecutionRegistration(
+            nodeId,
+            NodeKind.ConditionWait,
+            typeof(bool),
             dependencyResultTypes.ToArray(),
             Execute);
     }
@@ -145,6 +165,26 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
 
     public IReadOnlyList<NodeInitialization> GetPendingNodeInitializations()
         => _pendingInitializations.Values.ToArray();
+
+    public bool TryConfigureConditionTimeout(
+        NodeId nodeId,
+        TimeSpan timeout)
+    {
+        if (!_pendingInitializations.TryGetValue(nodeId, out var initialization) ||
+            initialization is not ConditionNodeInitialization condition)
+        {
+            return false;
+        }
+
+        _pendingInitializations[nodeId] = condition with
+        {
+            ConditionWait = condition.ConditionWait with
+            {
+                ExpiresAt = condition.ConditionWait.CreatedAt.Add(timeout)
+            }
+        };
+        return true;
+    }
 
     public void MarkNodeDeclarationsFlushed()
     {

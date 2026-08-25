@@ -155,7 +155,11 @@ public sealed class InMemoryNodeStore : INodeStore
         {
             var node = GetRequired(flowInstanceId, nodeId);
 
-            if (node.Status is NodeStatus.Completed or NodeStatus.Failed or NodeStatus.Cancelled)
+            if (node.Status is NodeStatus.Completed
+                or NodeStatus.Failed
+                or NodeStatus.Cancelled
+                or NodeStatus.TimedOut
+                or NodeStatus.Skipped)
             {
                 return ValueTask.CompletedTask;
             }
@@ -211,6 +215,7 @@ public sealed class InMemoryNodeStore : INodeStore
     public ValueTask MarkWaitingAsync(
         FlowInstanceId flowInstanceId,
         NodeId nodeId,
+        int attempt,
         DateTimeOffset updatedAt,
         CancellationToken cancellationToken = default)
     {
@@ -224,6 +229,35 @@ public sealed class InMemoryNodeStore : INodeStore
                 Status = NodeStatus.Waiting,
                 UpdatedAt = updatedAt
             };
+
+            CompleteLatestAttempt(flowInstanceId, nodeId, attempt, NodeStatus.Waiting, updatedAt, null);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask MarkTimedOutAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        string error,
+        DateTimeOffset timedOutAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var node = GetRequired(flowInstanceId, nodeId);
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.TimedOut,
+                Error = error,
+                CompletedAt = timedOutAt,
+                UpdatedAt = timedOutAt
+            };
+
+            CompleteLatestAttempt(flowInstanceId, nodeId, attempt, NodeStatus.TimedOut, timedOutAt, error);
         }
 
         return ValueTask.CompletedTask;
@@ -309,7 +343,8 @@ public sealed class InMemoryNodeStore : INodeStore
 
             foreach (var node in nodes)
             {
-                if (node.Kind != NodeKind.Step || node.Status != NodeStatus.Pending)
+                if (node.Kind is not (NodeKind.Step or NodeKind.ConditionWait) ||
+                    node.Status != NodeStatus.Pending)
                 {
                     continue;
                 }

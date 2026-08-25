@@ -102,6 +102,16 @@ public interface IFlowContext
         SignalWaitOptions? options = null);
 
     /// <summary>
+    /// Declares a durable condition that is checked immediately and then at the specified interval.
+    /// </summary>
+    ConditionNode WaitForCondition(
+        string id,
+        string name,
+        TimeSpan pollingInterval,
+        IReadOnlyList<Node> dependencies,
+        ConditionCallback condition);
+
+    /// <summary>
     /// Forks the execution into a namespace. This allows awaits inside the fork without affecting the entire flow.
     /// </summary>
     /// <typeparam name="TValue">The return type of the flow</typeparam>

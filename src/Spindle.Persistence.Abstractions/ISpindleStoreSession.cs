@@ -1,4 +1,5 @@
 using Spindle.Persistence.FlowDefinitions;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
@@ -18,6 +19,8 @@ public interface ISpindleStoreSession
     INodeStore Nodes { get; }
 
     ITimerStore Timers { get; }
+
+    IConditionWaitStore Conditions { get; }
 
     ISignalStore Signals { get; }
 

@@ -1,5 +1,6 @@
 ﻿using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.FlowInstances;
 using Spindle.Persistence.History;
 using Spindle.Persistence.Leases;
@@ -22,6 +23,8 @@ internal sealed class CountingStoreSession(
     public INodeStore Nodes => steps;
 
     public ITimerStore Timers => inner.Timers;
+
+    public IConditionWaitStore Conditions => inner.Conditions;
 
     public ISignalStore Signals => inner.Signals;
 

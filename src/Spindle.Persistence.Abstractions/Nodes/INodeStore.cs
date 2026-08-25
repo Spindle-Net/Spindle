@@ -50,7 +50,16 @@ public interface INodeStore
     ValueTask MarkWaitingAsync(
         FlowInstanceId flowInstanceId,
         NodeId nodeId,
+        int attempt,
         DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default);
+
+    ValueTask MarkTimedOutAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        string error,
+        DateTimeOffset timedOutAt,
         CancellationToken cancellationToken = default);
 
     ValueTask MarkCompletedAsync(

@@ -8,6 +8,7 @@ using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
 using Spindle.Persistence.EFCore;
+using Spindle.Persistence.Conditions;
 using Spindle.Persistence.EFCore.Sqlite;
 using Spindle.Persistence.FlowDefinitions;
 using Spindle.Persistence.FlowInstances;
@@ -23,6 +24,67 @@ namespace Spindle.Persistence.EFCore.Tests;
 
 public sealed class EntityFrameworkPersistenceTests
 {
+    [Fact]
+    public async Task ConditionWaits_PersistPollingIntervalAndDeadline()
+    {
+        var connectionString = $"Data Source=SpindleConditionWaitTests-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
+        await using var databaseAnchor = new SqliteConnection(connectionString);
+        await databaseAnchor.OpenAsync();
+
+        var services = new ServiceCollection();
+        services.AddSpindleSqlite(connectionString);
+        await using var provider = services.BuildServiceProvider();
+        var database = provider.GetRequiredService<SpindleDbContext>();
+        await database.Database.MigrateAsync();
+
+        var store = provider.GetRequiredService<ISpindleStore>();
+        var now = DateTimeOffset.Parse("2026-08-25T12:00:00Z");
+        var instanceId = new FlowInstanceId("condition-instance");
+        var nodeId = new NodeId("condition");
+
+        await store.FlowInstances.CreateAsync(new FlowInstanceRecord
+        {
+            InstanceId = instanceId,
+            FlowName = new FlowName("condition-flow"),
+            FlowVersion = new FlowVersion("1"),
+            DefinitionHash = "hash",
+            Status = FlowInstanceStatus.Waiting,
+            Input = new SerializedPayload
+            {
+                ContentType = "application/json",
+                TypeName = typeof(object).FullName!,
+                Data = []
+            },
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await store.Nodes.CreateAsync(new NodeInstanceRecord
+        {
+            FlowInstanceId = instanceId,
+            NodeId = nodeId,
+            Name = "Condition",
+            Kind = NodeKind.ConditionWait,
+            Status = NodeStatus.Waiting,
+            DispatchMode = StepDispatchMode.LocalWorker,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await store.Conditions.CreateAsync(new ConditionWaitRecord
+        {
+            FlowInstanceId = instanceId,
+            NodeId = nodeId,
+            PollingInterval = TimeSpan.FromMinutes(5),
+            ExpiresAt = now.AddDays(31),
+            CreatedAt = now
+        });
+
+        var persisted = await store.Conditions.GetAsync(instanceId, nodeId);
+
+        Assert.NotNull(persisted);
+        Assert.Equal(TimeSpan.FromMinutes(5), persisted.PollingInterval);
+        Assert.Equal(now.AddDays(31), persisted.ExpiresAt);
+    }
+
     [Fact]
     public async Task GenericNodesMigration_PreservesExistingNodesAndDependencies()
     {

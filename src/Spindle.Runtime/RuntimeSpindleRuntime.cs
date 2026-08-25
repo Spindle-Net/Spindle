@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Exceptions;
 using Spindle.Abstractions.Flows;
+using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
@@ -336,6 +337,45 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             await storeSession.Timers
                                 .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
                                 .ConfigureAwait(false);
+                            continue;
+                        }
+
+                        if (step.Kind == NodeKind.ConditionWait)
+                        {
+                            var condition = await storeSession.Conditions
+                                .GetAsync(timer.FlowInstanceId, timer.NodeId, storeCancellationToken)
+                                .ConfigureAwait(false)
+                                ?? throw new InvalidOperationException(
+                                    $"Condition metadata for node '{timer.NodeId}' does not exist.");
+
+                            if (condition.ExpiresAt is { } expiresAt && now >= expiresAt)
+                            {
+                                await storeSession.Nodes.MarkTimedOutAsync(
+                                        timer.FlowInstanceId,
+                                        timer.NodeId,
+                                        step.Attempt,
+                                        $"Condition node '{timer.NodeId}' timed out at {expiresAt:O}.",
+                                        now,
+                                        storeCancellationToken)
+                                    .ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                await storeSession.Nodes.MarkReadyAsync(
+                                        timer.FlowInstanceId,
+                                        timer.NodeId,
+                                        now,
+                                        storeCancellationToken)
+                                    .ConfigureAwait(false);
+                            }
+
+                            await storeSession.Timers.MarkFiredAsync(
+                                    timer.FlowInstanceId,
+                                    timer.NodeId,
+                                    now,
+                                    storeCancellationToken)
+                                .ConfigureAwait(false);
+                            fired++;
                             continue;
                         }
 
