@@ -112,6 +112,10 @@ public interface ISpindleRuntime
         string? reason = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Schedules failed or timed-out steps with a fresh retry budget, preserving completed work and lifetime attempts.</summary>
+    /// <param name="instanceId">The active or recoverable flow.</param>
+    /// <param name="nodeId">An eligible step, or null to retry all eligible steps.</param>
+    /// <param name="cancellationToken">Cancellation for scheduling recovery.</param>
     ValueTask RetryAsync(
         FlowInstanceId instanceId,
         NodeId? nodeId = null,

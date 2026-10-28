@@ -20,8 +20,9 @@ internal class ConcurrencyHelper
     /// Asynchronously obtains the lock
     /// </summary>
     /// <param name="flowInstanceId">The instance to aquire the lock for</param>
+    /// <param name="cancellationToken">Cancels waiting for the lock.</param>
     /// <returns></returns>
-    public static async Task AquireLock(FlowInstanceId flowInstanceId)
+    public static async Task AquireLock(FlowInstanceId flowInstanceId, CancellationToken cancellationToken = default)
     {
         SemaphoreSlim? semaphore;
         lock (_semaphores)
@@ -33,7 +34,7 @@ internal class ConcurrencyHelper
             }
         }
 
-        await semaphore.WaitAsync();
+        await semaphore.WaitAsync(cancellationToken);
     }
 
     public static void ReleaseLock(FlowInstanceId flowInstanceId)

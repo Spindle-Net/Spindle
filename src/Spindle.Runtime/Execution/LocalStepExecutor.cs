@@ -74,6 +74,7 @@ internal sealed class LocalStepExecutor(
         }
 
         var attemptId = new StepAttemptId(Guid.NewGuid().ToString("N"));
+        var leaseOwner = $"{workerId}:{attemptId.Value}";
         var leaseAcquiredAt = timeProvider.GetUtcNow();
         var running = await store
             .ExecuteAsync(
@@ -85,7 +86,7 @@ internal sealed class LocalStepExecutor(
                             {
                                 FlowInstanceId = step.FlowInstanceId,
                                 NodeId = step.NodeId,
-                                Owner = workerId,
+                                Owner = leaseOwner,
                                 AcquiredAt = leaseAcquiredAt,
                                 ExpiresAt = leaseAcquiredAt.Add(leaseDuration)
                             },
@@ -108,7 +109,7 @@ internal sealed class LocalStepExecutor(
                             .ReleaseStepLeaseAsync(
                                 step.FlowInstanceId,
                                 step.NodeId,
-                                workerId,
+                                leaseOwner,
                                 storeCancellationToken)
                             .ConfigureAwait(false);
                         return null;
@@ -137,139 +138,196 @@ internal sealed class LocalStepExecutor(
             return StepExecutionResult.NotExecuted;
         }
 
-        using var activity = Telemetry.ActivitySource.StartActivity($"{step.Name} - Attempt {step.Attempt}");
+        using var activity = Telemetry.ActivitySource.StartActivity($"{step.Name} - Attempt {running.Attempt}");
         activity?.SetTag("spindle.worker-id", workerId);
-
+        using var executionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var renewalCancellation = new CancellationTokenSource();
+        var renewal = RenewLeaseAsync(running, leaseOwner, renewalCancellation.Token);
         try
         {
-            var stepLogger = new StepLogger(session, running, step, logger);
-            var context = new DefaultStepExecutionContext(
-                step.FlowInstanceId,
-                step.NodeId,
-                attemptId,
-                running.Attempt,
-                services,
-                stepLogger,
-                cancellationToken);
-
-            var inputs = await BuildInputsAsync(session, running, registration, cancellationToken)
-                .ConfigureAwait(false);
-
-            // TODO: Make a difference of immediate and
-            object? result;
-            using (var executeActivity = Telemetry.ActivitySource.StartActivity($"ExecuteStepCode - {step.NodeId}"))
+            var inputs = await BuildInputsAsync(session, running, registration, cancellationToken).ConfigureAwait(false);
+            var invocation = ExecuteCallbackAsync(session, running, registration, attemptId, inputs, executionCancellation.Token);
+            if (await Task.WhenAny(invocation, renewal).ConfigureAwait(false) == renewal)
             {
-                result = await registration.Execute(inputs, context)
-                    .ConfigureAwait(false);
+                executionCancellation.Cancel();
+                try { await invocation.ConfigureAwait(false); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+                await renewal.ConfigureAwait(false);
+            }
+            var outcome = await invocation.ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (registration.Kind == NodeKind.ConditionWait && outcome.Exception is null)
+            {
+                if (outcome.Result is not bool satisfied)
+                    throw new InvalidOperationException("Condition callback did not return a Boolean.");
+                return await CompleteConditionCheckAsync(session, running, satisfied, leaseOwner, cancellationToken).ConfigureAwait(false);
             }
 
-            if (registration.Kind == NodeKind.ConditionWait)
+            var result = outcome.Result;
+            var continueAfterTimeout = outcome.TimedOut && running.Timeout?.Behavior == Spindle.Abstractions.Policies.TimeoutBehavior.Continue;
+            if (continueAfterTimeout)
+                result = registration.ResultType.IsValueType ? Activator.CreateInstance(registration.ResultType) : null;
+            // Serialization errors are infrastructure failures, outside the callback retry path.
+            var payload = outcome.Exception is null || continueAfterTimeout
+                ? SerializerReflection.Serialize(serializer, result, registration.ResultType) : null;
+            var now = timeProvider.GetUtcNow();
+            await ConcurrencyHelper.AquireLock(step.FlowInstanceId, cancellationToken).ConfigureAwait(false);
+            StepExecutionResult executionResult;
+            try
             {
-                if (result is not bool conditionSatisfied)
+                executionResult = await store.ExecuteAsync(async (storeSession, token) =>
                 {
-                    throw new InvalidOperationException(
-                        $"Condition node '{step.NodeId}' did not return a Boolean result.");
-                }
-
-                return await CompleteConditionCheckAsync(
-                        session,
-                        running,
-                        conditionSatisfied,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            await ConcurrencyHelper.AquireLock(step.FlowInstanceId);
-            await store
-                .ExecuteAsync(
-                    async (storeSession, storeCancellationToken) =>
+                    var flow = await storeSession.FlowInstances.GetAsync(step.FlowInstanceId, token);
+                    if (flow is null || flow.Status is FlowInstanceStatus.Cancelled or FlowInstanceStatus.Completed)
                     {
-                        await storeSession.Nodes
-                            .MarkCompletedAsync(
-                                step.FlowInstanceId,
-                                step.NodeId,
-                                running.Attempt,
-                                SerializerReflection.Serialize(serializer, result, registration.ResultType),
-                                timeProvider.GetUtcNow(),
-                                storeCancellationToken)
-                            .ConfigureAwait(false);
-
-                        await storeSession.Nodes
-                            .MarkDependentsReadyAsync(
-                                step.FlowInstanceId,
-                                [step.NodeId],
-                                timeProvider.GetUtcNow(),
-                                storeCancellationToken)
-                            .ConfigureAwait(false);
-
-                        await storeSession.Leases
-                            .ReleaseStepLeaseAsync(
-                                step.FlowInstanceId,
-                                step.NodeId,
-                                workerId,
-                                storeCancellationToken)
-                            .ConfigureAwait(false);
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-            ConcurrencyHelper.ReleaseLock(step.FlowInstanceId);
-
-            session.SetResult(step.NodeId, result);
-            activity?.SetStatus(ActivityStatusCode.Ok);
-
-            return StepExecutionResult.Succeeded;
+                        await storeSession.Nodes.TryUpdateExecutionAsync(running with { Status = NodeStatus.Cancelled,
+                            UpdatedAt = now, CompletedAt = now }, running.Attempt, NodeStatus.Running,
+                            NodeStatus.Cancelled, token);
+                        return new StepExecutionResult(true, NodeStatus.Cancelled);
+                    }
+                    var timedOut = outcome.TimedOut;
+                    var attemptStatus = timedOut ? NodeStatus.TimedOut : outcome.Exception is null ? NodeStatus.Completed : NodeStatus.Failed;
+                    var error = outcome.Exception?.Message;
+                    var cancelFlow = timedOut && running.Timeout?.Behavior == Spindle.Abstractions.Policies.TimeoutBehavior.Cancel;
+                    var succeeded = outcome.Exception is null || continueAfterTimeout;
+                    var budgetAttempt = running.Attempt - running.RetryAttemptBaseline;
+                    var retry = !succeeded && !cancelFlow && running.Kind == NodeKind.Step &&
+                        running.Retry is { } policy && budgetAttempt < policy.MaxAttempts;
+                    DateTimeOffset? retryAt = retry ? StepPolicy.DueAt(now, StepPolicy.Delay(running.Retry!, budgetAttempt)) : null;
+                    var status = succeeded ? NodeStatus.Completed : retry ? NodeStatus.Waiting : attemptStatus;
+                    var updated = running with { Status = status, Error = succeeded ? null : error,
+                        RetryAt = retryAt, CompletedAt = retry ? null : now, UpdatedAt = now };
+                    // Preserve timeout diagnostics on the attempt even when the node continues successfully.
+                    if (!await storeSession.Nodes.TryUpdateExecutionAsync(updated with { Error = error }, running.Attempt,
+                            NodeStatus.Running, attemptStatus, token)) return StepExecutionResult.NotExecuted;
+                    if (succeeded)
+                    {
+                        await storeSession.Nodes.MarkCompletedAsync(step.FlowInstanceId, step.NodeId, -1, payload, now, token);
+                        await storeSession.Nodes.MarkDependentsReadyAsync(step.FlowInstanceId, [step.NodeId], now, token);
+                    }
+                    if (retryAt is { } dueAt)
+                        await storeSession.Timers.CreateAsync(new TimerRecord { FlowInstanceId = step.FlowInstanceId,
+                            NodeId = step.NodeId, DueAt = dueAt, CreatedAt = now }, token);
+                    if (cancelFlow)
+                        await storeSession.FlowInstances.UpdateStatusAsync(step.FlowInstanceId, FlowInstanceStatus.Cancelled, now, token);
+                    return new StepExecutionResult(true, status);
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            finally { ConcurrencyHelper.ReleaseLock(step.FlowInstanceId); }
+            if (executionResult.Status == NodeStatus.Completed) session.SetResult(step.NodeId, result);
+            activity?.SetStatus(executionResult.Status == NodeStatus.Completed ? ActivityStatusCode.Ok : ActivityStatusCode.Error,
+                outcome.Exception?.Message);
+            return executionResult;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await store.ExecuteAsync(async (storeSession, token) =>
+            {
+                var now = timeProvider.GetUtcNow();
+                await storeSession.Nodes.TryUpdateExecutionAsync(running with { Status = NodeStatus.Ready,
+                    RetryAttemptBaseline = running.RetryAttemptBaseline + 1, RetryAt = null,
+                    CompletedAt = null, UpdatedAt = now }, running.Attempt, NodeStatus.Running, NodeStatus.Cancelled, token);
+            }, CancellationToken.None).ConfigureAwait(false);
+            throw;
         }
         catch (Exception exception)
         {
-            activity?.AddEvent(
-                new ActivityEvent(
-                    "exception",
-                    tags: new ActivityTagsCollection
-                    {
-                        { "exception.type", exception.GetType().FullName },
-                        { "exception.message", exception.Message },
-                        { "exception.stacktrace", exception.ToString() },
-                    }));
-            try
+            // Infrastructure failures are terminal and never consume a retry policy.
+            await store.ExecuteAsync(async (storeSession, token) =>
             {
-                await store
-                    .ExecuteAsync(
-                        (storeSession, storeCancellationToken) =>
-                            storeSession.Nodes.MarkFailedAsync(
-                                step.FlowInstanceId,
-                                step.NodeId,
-                                running.Attempt,
-                                exception.Message,
-                                timeProvider.GetUtcNow(),
-                                retryAt: null,
-                                storeCancellationToken),
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                var now = timeProvider.GetUtcNow();
+                await storeSession.Nodes.TryUpdateExecutionAsync(running with { Status = NodeStatus.Failed,
+                    Error = exception.Message, CompletedAt = now, UpdatedAt = now }, running.Attempt,
+                    NodeStatus.Running, NodeStatus.Failed, token);
+            }, CancellationToken.None).ConfigureAwait(false);
+            logger?.LogError(exception, "Infrastructure failure for step {NodeId}", step.NodeId);
+            return StepExecutionResult.Failed;
+        }
+        finally
+        {
+            renewalCancellation.Cancel();
+            try { await renewal.ConfigureAwait(false); }
+            catch (OperationCanceledException) when (renewalCancellation.IsCancellationRequested) { }
+            catch (Exception exception)
+            {
+                logger?.LogError(exception, "Lease renewal failed for step {NodeId}", step.NodeId);
             }
             finally
             {
-                await store
-                    .ExecuteAsync(
-                        (storeSession, storeCancellationToken) =>
-                            storeSession.Leases.ReleaseStepLeaseAsync(
-                                step.FlowInstanceId,
-                                step.NodeId,
-                                workerId,
-                                storeCancellationToken),
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
+                await store.ExecuteAsync((storeSession, token) => storeSession.Leases.ReleaseStepLeaseAsync(
+                    step.FlowInstanceId, step.NodeId, leaseOwner, token), CancellationToken.None).ConfigureAwait(false);
             }
-
-            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
         }
+    }
 
-        return StepExecutionResult.Failed;
+    private async Task RenewLeaseAsync(NodeInstanceRecord step, string leaseOwner, CancellationToken cancellationToken)
+    {
+        var interval = TimeSpan.FromTicks(Math.Max(1, leaseDuration.Ticks / 2));
+        while (true)
+        {
+            await Task.Delay(interval, timeProvider, cancellationToken).ConfigureAwait(false);
+            var now = timeProvider.GetUtcNow();
+            var acquired = await store.ExecuteAsync((session, token) => session.Leases.TryAcquireStepLeaseAsync(
+                new StepLeaseRecord { FlowInstanceId = step.FlowInstanceId, NodeId = step.NodeId,
+                    Owner = leaseOwner, AcquiredAt = now, ExpiresAt = now.Add(leaseDuration) }, token), cancellationToken);
+            if (!acquired) throw new InvalidOperationException("Step lease was lost during execution.");
+        }
+    }
+
+    private async Task<StepCallbackOutcome> ExecuteCallbackAsync(FlowExecutionSession session, NodeInstanceRecord running,
+        StepExecutionRegistration registration, StepAttemptId attemptId, NodeInputs inputs, CancellationToken cancellationToken)
+    {
+        var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timerCancellation = new CancellationTokenSource();
+        var context = new DefaultStepExecutionContext(running.FlowInstanceId, running.NodeId, attemptId, running.Attempt,
+            services, new StepLogger(session, running, running, logger), attemptCancellation.Token);
+        // Invoke independently so a synchronously blocking callback cannot prevent deadline handling.
+        var callback = Task.Run(async () => await registration.Execute(inputs, context).ConfigureAwait(false), CancellationToken.None);
+        var deadline = running.Timeout is { } timeout
+            ? StepPolicy.DelayAsync(timeout.Timeout, timeProvider, timerCancellation.Token)
+            : Task.Delay(Timeout.InfiniteTimeSpan, timerCancellation.Token);
+        using var cancellationWait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timerCancellation.Token);
+        var cancelled = Task.Delay(Timeout.InfiniteTimeSpan, cancellationWait.Token);
+        try
+        {
+            var winner = await Task.WhenAny(callback, deadline, cancelled).ConfigureAwait(false);
+            if (winner == callback)
+            {
+                try { return new StepCallbackOutcome(await callback.ConfigureAwait(false), null, false); }
+                catch (Exception exception) { return new StepCallbackOutcome(null, exception, false); }
+            }
+            try { attemptCancellation.Cancel(); }
+            catch (AggregateException exception)
+            {
+                logger?.LogWarning(exception, "Step cancellation callback threw for {NodeId}", running.NodeId);
+            }
+            var grace = running.Timeout?.CancellationGracePeriod ?? TimeSpan.FromSeconds(5);
+            if (!callback.IsCompleted && grace > TimeSpan.Zero)
+                await Task.WhenAny(callback, StepPolicy.DelayAsync(grace, timeProvider, timerCancellation.Token)).ConfigureAwait(false);
+            _ = ObserveCallbackAsync(callback, attemptCancellation);
+            attemptCancellation = null!; // The observer owns cleanup, including abandoned callbacks.
+            cancellationToken.ThrowIfCancellationRequested();
+            return new StepCallbackOutcome(null, new TimeoutException($"Step '{running.NodeId}' exceeded its execution timeout."), true);
+        }
+        finally
+        {
+            timerCancellation.Cancel();
+            attemptCancellation?.Dispose();
+        }
+    }
+
+    private static async Task ObserveCallbackAsync(Task<object?> callback, CancellationTokenSource cancellation)
+    {
+        try { await callback.ConfigureAwait(false); }
+        catch (Exception) { /* Late outcomes must never mutate workflow state. */ }
+        finally { cancellation.Dispose(); }
     }
 
     private async Task<StepExecutionResult> CompleteConditionCheckAsync(
         FlowExecutionSession session,
         NodeInstanceRecord condition,
         bool satisfied,
+        string leaseOwner,
         CancellationToken cancellationToken)
     {
         var wait = await store.Conditions
@@ -296,7 +354,7 @@ internal sealed class LocalStepExecutor(
                         await storeSession.Leases.ReleaseStepLeaseAsync(
                                 condition.FlowInstanceId,
                                 condition.NodeId,
-                                workerId,
+                                leaseOwner,
                                 storeCancellationToken)
                             .ConfigureAwait(false);
                     },
@@ -328,7 +386,7 @@ internal sealed class LocalStepExecutor(
                         await storeSession.Leases.ReleaseStepLeaseAsync(
                                 condition.FlowInstanceId,
                                 condition.NodeId,
-                                workerId,
+                                leaseOwner,
                                 storeCancellationToken)
                             .ConfigureAwait(false);
                     },
@@ -368,7 +426,7 @@ internal sealed class LocalStepExecutor(
                     await storeSession.Leases.ReleaseStepLeaseAsync(
                             condition.FlowInstanceId,
                             condition.NodeId,
-                            workerId,
+                            leaseOwner,
                             storeCancellationToken)
                         .ConfigureAwait(false);
                 },

@@ -9,6 +9,21 @@ public sealed class InMemoryFlowInstanceStore : IFlowInstanceStore
     private readonly object _gate = new();
     private readonly Dictionary<FlowInstanceId, FlowInstanceRecord> _instances = [];
 
+    public ValueTask<bool> TryReopenAsync(FlowInstanceId instanceId, DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var current = GetRequired(instanceId);
+            if (current.Status is FlowInstanceStatus.Completed or FlowInstanceStatus.Cancelled)
+                return ValueTask.FromResult(false);
+            _instances[instanceId] = current with { Status = FlowInstanceStatus.Waiting, Error = null,
+                CompletedAt = null, UpdatedAt = updatedAt };
+            return ValueTask.FromResult(true);
+        }
+    }
+
     public ValueTask CreateAsync(
         FlowInstanceRecord instance,
         CancellationToken cancellationToken = default)

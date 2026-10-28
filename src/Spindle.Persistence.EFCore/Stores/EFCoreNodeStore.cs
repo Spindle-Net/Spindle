@@ -34,6 +34,9 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         Input = node.Input,
         Result = node.Result,
         Error = node.Error,
+        RetryAttemptBaseline = node.RetryAttemptBaseline,
+        RetryJson = node.Retry is null ? null : System.Text.Json.JsonSerializer.Serialize(node.Retry),
+        TimeoutJson = node.Timeout is null ? null : System.Text.Json.JsonSerializer.Serialize(node.Timeout),
         Attempt = node.Attempt,
         RetryAt = node.RetryAt,
         StartedAt = node.StartedAt,
@@ -41,6 +44,28 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         CreatedAt = node.CreatedAt,
         UpdatedAt = node.UpdatedAt,
     };
+
+    public async ValueTask<bool> TryUpdateExecutionAsync(
+        NodeInstanceRecord node, int expectedAttempt, NodeStatus expectedStatus,
+        NodeStatus? attemptOutcome = null, CancellationToken cancellationToken = default)
+    {
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == node.FlowInstanceId.Value && x.NodeId == node.NodeId.Value &&
+                        x.Attempt == expectedAttempt && x.Status == expectedStatus)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.Status, node.Status)
+                .SetProperty(x => x.RetryAttemptBaseline, node.RetryAttemptBaseline)
+                .SetProperty(x => x.RetryAt, node.RetryAt)
+                .SetProperty(x => x.Error, node.Error)
+                .SetProperty(x => x.StartedAt, node.StartedAt)
+                .SetProperty(x => x.CompletedAt, node.CompletedAt)
+                .SetProperty(x => x.UpdatedAt, node.UpdatedAt), cancellationToken);
+        if (updated == 0) return false;
+        if (attemptOutcome is { } outcome)
+            await CompleteAttemptAsync(node.FlowInstanceId, node.NodeId, expectedAttempt, outcome,
+                node.UpdatedAt, node.Error, cancellationToken);
+        return true;
+    }
 
     public async ValueTask CreateAsync(
         NodeInstanceRecord node,
@@ -124,6 +149,9 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         Input = x.Input,
         Result = x.Result,
         Error = x.Error,
+        RetryAttemptBaseline = x.RetryAttemptBaseline,
+        Retry = x.RetryJson is null ? null : System.Text.Json.JsonSerializer.Deserialize<Spindle.Abstractions.Policies.RetryPolicy>(x.RetryJson),
+        Timeout = x.TimeoutJson is null ? null : System.Text.Json.JsonSerializer.Deserialize<Spindle.Abstractions.Policies.TimeoutPolicy>(x.TimeoutJson),
         Attempt = x.Attempt,
         RetryAt = x.RetryAt,
         StartedAt = x.StartedAt,
@@ -261,6 +289,9 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
             .ExecuteUpdateAsync(u => u
                 .SetProperty(x => x.Status, _ => NodeStatus.Running)
                 .SetProperty(x => x.Attempt, _ => prevAttempt.Attempt + 1)
+                .SetProperty(x => x.RetryAt, (DateTimeOffset?)null)
+                .SetProperty(x => x.Error, (string?)null)
+                .SetProperty(x => x.CompletedAt, (DateTimeOffset?)null)
                 .SetProperty(x => x.StartedAt, _ => startedAt)
                 .SetProperty(x => x.UpdatedAt, _ => startedAt)
             , cancellationToken);

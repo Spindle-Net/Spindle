@@ -7,6 +7,16 @@ namespace Spindle.Persistence.Nodes;
 
 public interface INodeStore
 {
+    /// <summary>Conditionally updates status, retry budget, timestamps and error for the expected attempt and status.
+    /// Results and declaration metadata are unchanged.
+    /// Optionally closes that attempt with an outcome distinct from the node's state.</summary>
+    ValueTask<bool> TryUpdateExecutionAsync(
+        NodeInstanceRecord node,
+        int expectedAttempt,
+        NodeStatus expectedStatus,
+        NodeStatus? attemptOutcome = null,
+        CancellationToken cancellationToken = default);
+
     ValueTask CreateAsync(
         NodeInstanceRecord node,
         CancellationToken cancellationToken = default);

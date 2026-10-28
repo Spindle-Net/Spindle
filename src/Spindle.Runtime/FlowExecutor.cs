@@ -19,6 +19,17 @@ internal sealed class FlowExecutor(
         FlowExecutionSession session,
         CancellationToken cancellationToken = default)
     {
+        // Recovery must serialize with replay, but may proceed while callbacks are running.
+        await ConcurrencyHelper.AquireLock(instanceId, cancellationToken).ConfigureAwait(false);
+        try { await ExecuteCoreAsync(instanceId, session, cancellationToken).ConfigureAwait(false); }
+        finally { ConcurrencyHelper.ReleaseLock(instanceId); }
+    }
+
+    private async ValueTask ExecuteCoreAsync(
+        FlowInstanceId instanceId,
+        FlowExecutionSession session,
+        CancellationToken cancellationToken)
+    {
         var instance = await store.FlowInstances
             .GetAsync(instanceId, cancellationToken)
             .ConfigureAwait(false)
@@ -117,6 +128,7 @@ internal sealed class FlowExecutor(
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             await store

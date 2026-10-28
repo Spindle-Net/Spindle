@@ -74,6 +74,19 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
             Execute);
     }
 
+    public void ConfigureStep(NodeId nodeId, StepOptions options)
+    {
+        StepPolicy.Validate(options);
+        if (!_pendingNodeDeclarations.Contains(nodeId)) return;
+        _nodes[nodeId] = _nodes[nodeId] with
+        {
+            Retry = options.Retry,
+            Timeout = options.Timeout,
+            Queue = options.Queue,
+            DispatchMode = options.DispatchMode
+        };
+    }
+
     public bool TryGet(
         NodeId nodeId,
         out StepExecutionRegistration registration)

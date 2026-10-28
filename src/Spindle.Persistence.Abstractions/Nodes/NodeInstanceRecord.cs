@@ -34,6 +34,13 @@ public sealed record NodeInstanceRecord
 
     public string? Error { get; init; }
 
+    /// <summary>Lifetime attempt count at the start of the current retry budget.</summary>
+    public int RetryAttemptBaseline { get; init; }
+
+    public Spindle.Abstractions.Policies.RetryPolicy? Retry { get; init; }
+
+    public Spindle.Abstractions.Policies.TimeoutPolicy? Timeout { get; init; }
+
     public int Attempt { get; init; }
 
     public DateTimeOffset? RetryAt { get; init; }

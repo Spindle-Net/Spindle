@@ -5,6 +5,10 @@ namespace Spindle.Persistence.FlowInstances;
 
 public interface IFlowInstanceStore
 {
+    /// <summary>Reopens a recoverable flow and clears its terminal error and completion time.</summary>
+    ValueTask<bool> TryReopenAsync(FlowInstanceId instanceId, DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default);
+
     ValueTask CreateAsync(
         FlowInstanceRecord instance,
         CancellationToken cancellationToken = default);

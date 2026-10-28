@@ -27,6 +27,8 @@ internal sealed class RuntimeStepNode<TResult>(
     public override StepNode<TResult> WithOptions(Func<StepOptions, StepOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        return new RuntimeStepNode<TResult>(state, configure(options));
+        var configured = configure(options) ?? throw new ArgumentException("Step options cannot be null.", nameof(configure));
+        state.Session.ConfigureStep(state.Id, configured);
+        return new RuntimeStepNode<TResult>(state, configured);
     }
 }

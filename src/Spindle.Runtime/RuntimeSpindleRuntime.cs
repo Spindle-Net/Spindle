@@ -287,6 +287,17 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
 
                         if (executed == 0 && firedTimers == 0)
                         {
+                            var nodes = await _store.Nodes.GetByFlowInstanceAsync(handle.InstanceId, gateCancellationToken);
+                            var retryAt = nodes.Where(n => n.Status == NodeStatus.Waiting && n.RetryAt.HasValue)
+                                .Select(n => n.RetryAt).Min();
+                            if (retryAt is { } dueAt)
+                            {
+                                var delay = dueAt - _timeProvider.GetUtcNow();
+                                if (delay > TimeSpan.Zero)
+                                    await StepPolicy.DelayAsync(delay, _timeProvider, gateCancellationToken).ConfigureAwait(false);
+                                iteration--; // Durable waiting does not consume the execution iteration budget.
+                                continue;
+                            }
                             throw new NotSupportedException(
                                 $"Flow '{instance.FlowName}' instance '{instance.InstanceId}' is waiting, but no local ready steps can be executed by this runtime.");
                         }
@@ -327,6 +338,13 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             .GetAsync(timer.FlowInstanceId, timer.NodeId, storeCancellationToken)
                             .ConfigureAwait(false);
 
+                        var flow = await storeSession.FlowInstances.GetAsync(timer.FlowInstanceId, storeCancellationToken);
+                        if (flow is null || IsTerminal(flow.Status))
+                        {
+                            await storeSession.Timers.MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken);
+                            continue;
+                        }
+
                         if (step is null ||
                             step.Status is NodeStatus.Completed
                                 or NodeStatus.Failed
@@ -337,6 +355,20 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             await storeSession.Timers
                                 .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
                                 .ConfigureAwait(false);
+                            continue;
+                        }
+
+                        if (step.Kind == NodeKind.Step)
+                        {
+                            if (step.Status == NodeStatus.Waiting && step.RetryAt == timer.DueAt)
+                            {
+                                var ready = step with { Status = NodeStatus.Ready, RetryAt = null, Error = null,
+                                    CompletedAt = null, UpdatedAt = now };
+                                if (await storeSession.Nodes.TryUpdateExecutionAsync(ready, step.Attempt,
+                                        NodeStatus.Waiting, cancellationToken: storeCancellationToken))
+                                    fired++;
+                            }
+                            await storeSession.Timers.MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken);
                             continue;
                         }
 
@@ -616,24 +648,72 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
         string? reason = null,
         CancellationToken cancellationToken = default)
     {
-        await _store
-            .ExecuteAsync(
-                (storeSession, storeCancellationToken) =>
-                    storeSession.FlowInstances.UpdateStatusAsync(
-                        instanceId,
-                        FlowInstanceStatus.Cancelled,
-                        _timeProvider.GetUtcNow(),
-                        storeCancellationToken),
-                cancellationToken)
-            .ConfigureAwait(false);
+        await ConcurrencyHelper.AquireLock(instanceId, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _store.ExecuteAsync((session, token) => session.FlowInstances.UpdateStatusAsync(
+                instanceId, FlowInstanceStatus.Cancelled, _timeProvider.GetUtcNow(), token), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally { ConcurrencyHelper.ReleaseLock(instanceId); }
     }
 
-    public ValueTask RetryAsync(
+    public async ValueTask RetryAsync(
         FlowInstanceId instanceId,
         NodeId? nodeId = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("Retry is not supported by the local MVP runtime yet.");
+        await ConcurrencyHelper.AquireLock(instanceId, cancellationToken).ConfigureAwait(false);
+        try { await ScheduleRetryAsync(instanceId, nodeId, cancellationToken).ConfigureAwait(false); }
+        finally { ConcurrencyHelper.ReleaseLock(instanceId); }
+    }
+
+    private async ValueTask ScheduleRetryAsync(FlowInstanceId instanceId, NodeId? nodeId, CancellationToken cancellationToken)
+    {
+        // Serialize with local advancement; persisted comparisons also protect against stale recovery.
+        await _store.ExecuteAsync(async (session, token) =>
+        {
+            var flow = await session.FlowInstances.GetAsync(instanceId, token)
+                ?? throw new InvalidOperationException($"Flow instance '{instanceId}' does not exist.");
+            if (flow.Status is FlowInstanceStatus.Completed or FlowInstanceStatus.Cancelled)
+                throw new InvalidOperationException("Completed or cancelled flows cannot be retried.");
+            var nodes = await session.Nodes.GetByFlowInstanceAsync(instanceId, token);
+            var selected = nodes.Where(n => n.Kind == NodeKind.Step &&
+                n.Status is NodeStatus.Failed or NodeStatus.TimedOut &&
+                (nodeId is null || n.NodeId == nodeId)).ToArray();
+            if (selected.Length == 0)
+                throw new InvalidOperationException("No failed or timed-out step matches the retry request.");
+            var now = _timeProvider.GetUtcNow();
+            var recovered = new HashSet<NodeId>();
+            foreach (var node in selected)
+            {
+                var waiting = node with { Status = NodeStatus.Waiting, RetryAt = now,
+                    RetryAttemptBaseline = node.Attempt, Error = null, StartedAt = null,
+                    CompletedAt = null, UpdatedAt = now };
+                if (!await session.Nodes.TryUpdateExecutionAsync(waiting, node.Attempt, node.Status,
+                        cancellationToken: token)) continue;
+                recovered.Add(node.NodeId);
+                await session.Timers.CreateAsync(new Spindle.Persistence.Timers.TimerRecord
+                    { FlowInstanceId = instanceId, NodeId = node.NodeId, DueAt = now, CreatedAt = now }, token);
+            }
+            if (recovered.Count == 0) return;
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (var barrier in nodes.Where(n => n.Kind is NodeKind.WaitAll or NodeKind.WaitAny &&
+                             n.Status == NodeStatus.Failed && !recovered.Contains(n.NodeId) &&
+                             n.Dependencies.Any(recovered.Contains)))
+                {
+                    if (await session.Nodes.TryUpdateExecutionAsync(barrier with { Status = NodeStatus.Waiting,
+                            Error = null, CompletedAt = null, UpdatedAt = now }, barrier.Attempt,
+                            NodeStatus.Failed, cancellationToken: token))
+                        changed |= recovered.Add(barrier.NodeId);
+                }
+            } while (changed);
+            if (!await session.FlowInstances.TryReopenAsync(instanceId, now, token))
+                throw new InvalidOperationException("The flow became terminal during recovery.");
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask<FlowInstanceSnapshot?> GetInstanceAsync(
@@ -699,6 +779,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             if (before[i].NodeId != after[i].NodeId ||
                 before[i].Status != after[i].Status ||
                 before[i].Attempt != after[i].Attempt ||
+                before[i].RetryAt != after[i].RetryAt ||
                 before[i].CompletedAt != after[i].CompletedAt ||
                 before[i].Error != after[i].Error ||
                 !PayloadEquals(before[i].Result, after[i].Result))

@@ -1,4 +1,4 @@
-﻿using Spindle.Abstractions.Core;
+using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.Nodes;
 
@@ -50,6 +50,9 @@ internal sealed class CountingNodeStore(
         MarkFailedCalls = 0;
         MarkDependentsReadyCalls = 0;
     }
+
+    public ValueTask<bool> TryUpdateExecutionAsync(NodeInstanceRecord node, int expectedAttempt, NodeStatus expectedStatus, NodeStatus? attemptOutcome = null, CancellationToken cancellationToken = default) =>
+        inner.TryUpdateExecutionAsync(node, expectedAttempt, expectedStatus, attemptOutcome, cancellationToken);
 
     public ValueTask CreateAsync(
         NodeInstanceRecord step,

@@ -327,6 +327,7 @@ internal sealed class RuntimeFlowContext(
 
         var nodeId = new NodeId(id);
         var stepOptions = options ?? new StepOptions();
+        StepPolicy.Validate(stepOptions);
         var dependencyIds = dependencies.Select(dependency => dependency.Id).ToArray();
         var dependencyResultTypes = dependencies.Select(GetDependencyResultType).ToArray();
 
@@ -348,6 +349,8 @@ internal sealed class RuntimeFlowContext(
                     Kind = NodeKind.Step,
                     Status = status,
                     HandlerId = handlerId,
+                    Retry = stepOptions.Retry,
+                    Timeout = stepOptions.Timeout,
                     Queue = stepOptions.Queue,
                     DispatchMode = stepOptions.DispatchMode,
                     DependencyMode = DependencySatisfactionMode.AllSucceeded,

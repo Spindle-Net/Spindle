@@ -9,6 +9,15 @@ namespace Spindle.Persistence.EFCore.Stores;
 
 internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowInstanceStore
 {
+    public async ValueTask<bool> TryReopenAsync(FlowInstanceId instanceId, DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default) =>
+        await context.FlowInstances.Where(x => x.InstanceId == instanceId.Value &&
+                x.Status != FlowInstanceStatus.Completed && x.Status != FlowInstanceStatus.Cancelled)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.Status, FlowInstanceStatus.Waiting)
+                .SetProperty(x => x.Error, (string?)null)
+                .SetProperty(x => x.CompletedAt, (DateTimeOffset?)null)
+                .SetProperty(x => x.UpdatedAt, updatedAt), cancellationToken) > 0;
+
     public async ValueTask CreateAsync(
         FlowInstanceRecord instance,
         CancellationToken cancellationToken = default)
