@@ -54,6 +54,9 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
     private sealed class FlowInstanceStore(EFCoreSpindleStore store) : IFlowInstanceStore
     {
+        public ValueTask<bool> TryReopenAsync(FlowInstanceId instanceId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.FlowInstances.TryReopenAsync(instanceId, updatedAt, token), cancellationToken);
+
         public ValueTask CreateAsync(FlowInstanceRecord instance, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.FlowInstances.CreateAsync(instance, token), cancellationToken);
 
@@ -78,6 +81,9 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
     private sealed class NodeStore(EFCoreSpindleStore store) : INodeStore
     {
+        public ValueTask<bool> TryUpdateExecutionAsync(NodeInstanceRecord node, int expectedAttempt, NodeStatus expectedStatus, NodeStatus? attemptOutcome = null, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryUpdateExecutionAsync(node, expectedAttempt, expectedStatus, attemptOutcome, token), cancellationToken);
+
         public ValueTask CreateAsync(NodeInstanceRecord step, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Nodes.CreateAsync(step, token), cancellationToken);
 

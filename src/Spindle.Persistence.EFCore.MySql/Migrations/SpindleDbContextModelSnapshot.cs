@@ -279,11 +279,20 @@ namespace Spindle.Persistence.EFCore.MySql.Migrations
                     b.Property<long?>("RetryAt")
                         .HasColumnType("bigint");
 
+                    b.Property<int>("RetryAttemptBaseline")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RetryJson")
+                        .HasColumnType("longtext");
+
                     b.Property<long?>("StartedAt")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<string>("TimeoutJson")
+                        .HasColumnType("longtext");
 
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("bigint");

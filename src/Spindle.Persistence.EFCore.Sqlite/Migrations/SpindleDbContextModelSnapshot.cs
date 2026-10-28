@@ -277,11 +277,20 @@ namespace Spindle.Persistence.EFCore.Sqlite.Migrations
                     b.Property<long?>("RetryAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("RetryAttemptBaseline")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RetryJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("StartedAt")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("TimeoutJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("UpdatedAt")
                         .HasColumnType("INTEGER");

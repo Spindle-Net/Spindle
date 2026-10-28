@@ -12,6 +12,32 @@ public sealed class InMemoryNodeStore : INodeStore
     private readonly Dictionary<(FlowInstanceId FlowInstanceId, NodeId NodeId), NodeInstanceRecord> _nodes = [];
     private readonly List<StepAttemptRecord> _attempts = [];
 
+    public ValueTask<bool> TryUpdateExecutionAsync(
+        NodeInstanceRecord node, int expectedAttempt, NodeStatus expectedStatus,
+        NodeStatus? attemptOutcome = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var current = GetRequired(node.FlowInstanceId, node.NodeId);
+            if (current.Attempt != expectedAttempt || current.Status != expectedStatus)
+                return ValueTask.FromResult(false);
+            _nodes[(node.FlowInstanceId, node.NodeId)] = current with
+            {
+                Status = node.Status,
+                RetryAttemptBaseline = node.RetryAttemptBaseline,
+                RetryAt = node.RetryAt,
+                Error = node.Error,
+                StartedAt = node.StartedAt,
+                CompletedAt = node.CompletedAt,
+                UpdatedAt = node.UpdatedAt
+            };
+            if (attemptOutcome is { } outcome)
+                CompleteLatestAttempt(node.FlowInstanceId, node.NodeId, expectedAttempt, outcome, node.UpdatedAt, node.Error);
+            return ValueTask.FromResult(true);
+        }
+    }
+
     public ValueTask CreateAsync(
         NodeInstanceRecord node,
         CancellationToken cancellationToken = default)
@@ -193,6 +219,9 @@ public sealed class InMemoryNodeStore : INodeStore
             {
                 Status = NodeStatus.Running,
                 Attempt = nextAttempt,
+                RetryAt = null,
+                Error = null,
+                CompletedAt = null,
                 StartedAt = startedAt,
                 UpdatedAt = startedAt
             };

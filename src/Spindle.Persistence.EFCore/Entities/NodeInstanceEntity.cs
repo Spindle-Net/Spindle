@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
 using Spindle.Abstractions.Steps;
@@ -46,6 +46,13 @@ internal class NodeInstanceEntity
     public SerializedPayload? Result { get; set; }
 
     public string? Error { get; set; }
+
+    /// <summary>Lifetime attempt count at the start of the current retry budget.</summary>
+    public int RetryAttemptBaseline { get; set; }
+
+    public string? RetryJson { get; init; }
+
+    public string? TimeoutJson { get; init; }
 
     public int Attempt { get; set; }
 

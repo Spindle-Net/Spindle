@@ -112,3 +112,58 @@ The flow transforms each string into upper, lower, and camel-case outputs.
 - Only local `Immediate` and `LocalWorker` step execution is supported.
 - Queue dispatch, RabbitMQ, EF Core, remote flows, dashboards, source generators, and analyzers are not part of this package yet.
 - The worker polls persistence. Future transport-backed wakeups can reduce polling and support distributed queue workers.
+
+## Retries and step timeouts
+
+Local steps support durable retry policies, supplied in `StepOptions` or fluently:
+
+```csharp
+var result = await ctx.Step("fetch", "Fetch data", async step =>
+{
+    return await client.GetStringAsync(url, step.CancellationToken);
+})
+.WithRetry(RetryPolicy.Exponential(3))
+.WithTimeout(new TimeoutPolicy
+{
+    Timeout = TimeSpan.FromSeconds(30),
+    CancellationGracePeriod = TimeSpan.FromSeconds(5),
+    Behavior = TimeoutBehavior.Fail
+});
+```
+
+`MaxAttempts` includes the initial execution. An absent policy or `RetryPolicy.None`
+allows one attempt. Fixed, linear, and exponential delays use the failed attempt's
+one-based position within the current budget. Jitter multiplies the delay by a
+uniform factor in `1 ± JitterFactor`; `MaxDelay` caps the final delay. Callback
+exceptions are retried; infrastructure failures are terminal. Condition polling
+and queued execution do not use these policies.
+
+Retry delays are stored with durable timers. The hosted pump resumes due retries;
+`RunAsync` waits cancellably using its configured `TimeProvider`. Completed steps
+and their results are preserved during replay and recovery.
+
+At a step's timeout, its cancellation token is cancelled and cleanup is allowed
+for `CancellationGracePeriod` (five seconds by default). The timeout outcome still
+applies if the callback returns during cleanup. `Fail` retries while budget remains,
+then leaves a timed-out node; `Cancel` cancels the flow without retrying; `Continue`
+completes the node with `default(TResult)` without retrying. Attempt history retains
+the timeout even when the node continues successfully.
+
+After grace expires the runtime abandons the callback and ignores its late result
+or exception. It cannot forcibly stop in-process code: side effects may continue
+and overlap the next attempt. Steps should honor their cancellation token and make
+external operations idempotent. Caller/host cancellation interrupts execution without
+scheduling a retry; the interrupted node remains resumable.
+
+`RetryAsync(instanceId, nodeId)` schedules a failed or timed-out normal step
+immediately with a fresh policy budget. Omitting `nodeId` selects all eligible steps.
+Lifetime attempt numbers and history remain intact; affected failed wait barriers
+are reopened, while completed nodes and completed barriers are preserved. Recovery
+is allowed for active, failed, and timed-out flows and serialized with local flow
+advancement. It rejects completed/cancelled flows and requests without eligible work.
+The method schedules work; the pump executes it.
+
+Upgrade the database with the `AddStepRetryPolicies` migration before starting the
+new runtime. Existing nodes have no retry/timeout policies by default. Policies are
+captured when a node is first persisted; changing a flow's code does not replace the
+policies of existing nodes. Use a new flow version for changed policy semantics.
