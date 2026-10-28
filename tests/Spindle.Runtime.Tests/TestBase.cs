@@ -33,4 +33,38 @@ public class TestBase
 
         return (runtime, store, serializer, clock);
     }
+
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Waits in real time until the clock has at least <paramref name="count"/> scheduled timers.
+    /// </summary>
+    protected static async Task WaitForTimersAsync(FakeSpindleClock clock, int count = 1)
+    {
+        using var cancellation = new CancellationTokenSource(TestTimeout);
+        while (clock.ActiveTimerCount < count)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(2), cancellation.Token);
+        }
+    }
+
+    /// <summary>
+    /// Advances the clock by <paramref name="step"/> whenever a timer is waiting, until <paramref name="task"/> finishes.
+    /// </summary>
+    protected static async Task<T> DriveAsync<T>(Task<T> task, FakeSpindleClock clock, TimeSpan step)
+    {
+        using var cancellation = new CancellationTokenSource(TestTimeout);
+        while (!task.IsCompleted)
+        {
+            if (clock.ActiveTimerCount > 0)
+            {
+                clock.Advance(step);
+            }
+
+            await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(2), cancellation.Token));
+            cancellation.Token.ThrowIfCancellationRequested();
+        }
+
+        return await task;
+    }
 }

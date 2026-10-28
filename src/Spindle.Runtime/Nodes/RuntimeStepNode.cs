@@ -6,7 +6,8 @@ namespace Spindle;
 
 internal sealed class RuntimeStepNode<TResult>(
     RuntimeNodeState<TResult> state,
-    StepOptions options)
+    StepOptions options,
+    Func<StepOptions, bool> configureOptions)
     : StepNode<TResult>, IRuntimeNode
 {
     public override NodeId Id => state.Id;
@@ -27,6 +28,10 @@ internal sealed class RuntimeStepNode<TResult>(
     public override StepNode<TResult> WithOptions(Func<StepOptions, StepOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        return new RuntimeStepNode<TResult>(state, configure(options));
+
+        var configured = configure(options);
+        StepPolicies.Validate(configured);
+        configureOptions(configured);
+        return new RuntimeStepNode<TResult>(state, configured, configureOptions);
     }
 }

@@ -327,6 +327,7 @@ internal sealed class RuntimeFlowContext(
 
         var nodeId = new NodeId(id);
         var stepOptions = options ?? new StepOptions();
+        StepPolicies.Validate(stepOptions);
         var dependencyIds = dependencies.Select(dependency => dependency.Id).ToArray();
         var dependencyResultTypes = dependencies.Select(GetDependencyResultType).ToArray();
 
@@ -352,6 +353,8 @@ internal sealed class RuntimeFlowContext(
                     DispatchMode = stepOptions.DispatchMode,
                     DependencyMode = DependencySatisfactionMode.AllSucceeded,
                     Dependencies = dependencyIds,
+                    RetryPolicy = stepOptions.Retry,
+                    TimeoutPolicy = stepOptions.Timeout,
                     CreatedAt = now,
                     UpdatedAt = now
                 });
@@ -359,7 +362,8 @@ internal sealed class RuntimeFlowContext(
 
         return new RuntimeStepNode<TResult>(
             CreateState<TResult>(nodeId, name, NodeKind.Step),
-            stepOptions);
+            stepOptions,
+            configured => session.TryConfigureStepOptions(nodeId, configured));
     }
 
     private void DeclareBarrier(

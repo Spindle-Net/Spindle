@@ -123,6 +123,24 @@ public sealed class InMemoryNodeStore : INodeStore
         }
     }
 
+    public ValueTask<IReadOnlyList<StepAttemptRecord>> GetAttemptsAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var attempts = _attempts
+                .Where(attempt => attempt.FlowInstanceId == flowInstanceId && attempt.NodeId == nodeId)
+                .OrderBy(attempt => attempt.Attempt)
+                .ToArray();
+
+            return ValueTask.FromResult<IReadOnlyList<StepAttemptRecord>>(attempts);
+        }
+    }
+
     public ValueTask<IReadOnlyList<NodeInstanceRecord>> GetReadyNodesAsync(
         int maxCount,
         CancellationToken cancellationToken = default)
@@ -281,6 +299,7 @@ public sealed class InMemoryNodeStore : INodeStore
                 Status = NodeStatus.Completed,
                 Result = InMemoryRecordCopies.Copy(result),
                 Error = null,
+                RetryAt = null,
                 CompletedAt = completedAt,
                 UpdatedAt = completedAt
             };
@@ -318,6 +337,161 @@ public sealed class InMemoryNodeStore : INodeStore
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<bool> TryScheduleRetryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        NodeStatus attemptOutcome,
+        string error,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var node = GetRequired(flowInstanceId, nodeId);
+            if (node.Status != NodeStatus.Running || node.Attempt != attempt)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.Waiting,
+                Error = error,
+                RetryAt = retryAt,
+                UpdatedAt = updatedAt
+            };
+
+            CompleteLatestAttempt(flowInstanceId, nodeId, attempt, attemptOutcome, updatedAt, error);
+        }
+
+        return ValueTask.FromResult(true);
+    }
+
+    public ValueTask<bool> TryMarkRetryReadyAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            if (!_nodes.TryGetValue((flowInstanceId, nodeId), out var node) ||
+                node.Status != NodeStatus.Waiting ||
+                node.RetryAt != retryAt)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.Ready,
+                RetryAt = null,
+                UpdatedAt = updatedAt
+            };
+        }
+
+        return ValueTask.FromResult(true);
+    }
+
+    public ValueTask<bool> TryInterruptAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        DateTimeOffset interruptedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var node = GetRequired(flowInstanceId, nodeId);
+            if (node.Status != NodeStatus.Running || node.Attempt != attempt)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.Ready,
+                RetryAttemptBaseline = node.RetryAttemptBaseline + 1,
+                UpdatedAt = interruptedAt
+            };
+
+            CompleteLatestAttempt(flowInstanceId, nodeId, attempt, NodeStatus.Cancelled, interruptedAt, null);
+        }
+
+        return ValueTask.FromResult(true);
+    }
+
+    public ValueTask<bool> TryScheduleRecoveryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        NodeStatus expectedStatus,
+        int expectedAttempt,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var node = GetRequired(flowInstanceId, nodeId);
+            if (node.Status != expectedStatus || node.Attempt != expectedAttempt)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.Waiting,
+                RetryAt = retryAt,
+                RetryAttemptBaseline = node.Attempt,
+                CompletedAt = null,
+                UpdatedAt = updatedAt
+            };
+        }
+
+        return ValueTask.FromResult(true);
+    }
+
+    public ValueTask<bool> TryReopenBarrierAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var node = GetRequired(flowInstanceId, nodeId);
+            if (node.Kind is not (NodeKind.WaitAll or NodeKind.WaitAny) ||
+                node.Status != NodeStatus.Failed)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _nodes[(flowInstanceId, nodeId)] = node with
+            {
+                Status = NodeStatus.Waiting,
+                Result = null,
+                Error = null,
+                CompletedAt = null,
+                UpdatedAt = updatedAt
+            };
+        }
+
+        return ValueTask.FromResult(true);
     }
 
     public ValueTask MarkDependentsReadyAsync(

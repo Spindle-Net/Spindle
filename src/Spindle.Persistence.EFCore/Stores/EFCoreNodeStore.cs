@@ -34,7 +34,10 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         Input = node.Input,
         Result = node.Result,
         Error = node.Error,
+        RetryPolicy = node.RetryPolicy,
+        TimeoutPolicy = node.TimeoutPolicy,
         Attempt = node.Attempt,
+        RetryAttemptBaseline = node.RetryAttemptBaseline,
         RetryAt = node.RetryAt,
         StartedAt = node.StartedAt,
         CompletedAt = node.CompletedAt,
@@ -124,7 +127,10 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         Input = x.Input,
         Result = x.Result,
         Error = x.Error,
+        RetryPolicy = x.RetryPolicy,
+        TimeoutPolicy = x.TimeoutPolicy,
         Attempt = x.Attempt,
+        RetryAttemptBaseline = x.RetryAttemptBaseline,
         RetryAt = x.RetryAt,
         StartedAt = x.StartedAt,
         CompletedAt = x.CompletedAt,
@@ -185,6 +191,36 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
             .ToListAsync(cancellationToken);
 
         return entities.Select(EntityToRecord).ToArray();
+    }
+
+    public async ValueTask<IReadOnlyList<StepAttemptRecord>> GetAttemptsAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var entities = await context.StepAttempts
+            .AsNoTracking()
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .OrderBy(x => x.Attempt)
+            .ToListAsync(cancellationToken);
+
+        return entities
+            .Select(x => new StepAttemptRecord
+            {
+                FlowInstanceId = new FlowInstanceId(x.FlowInstanceId),
+                NodeId = new NodeId(x.NodeId),
+                AttemptId = new StepAttemptId(x.AttemptId),
+                Attempt = x.Attempt,
+                WorkerId = x.WorkerId,
+                Status = x.Status,
+                StartedAt = x.StartedAt,
+                CompletedAt = x.CompletedAt,
+                Error = x.Error
+            })
+            .ToArray();
     }
 
     public async ValueTask<IReadOnlyList<NodeInstanceRecord>> GetReadyNodesAsync(
@@ -370,6 +406,7 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
         node.Status = NodeStatus.Completed;
         node.Result = result;
         node.Error = null;
+        node.RetryAt = null;
         node.CompletedAt = completedAt;
         node.UpdatedAt = completedAt;
 
@@ -406,6 +443,144 @@ internal sealed class EFCoreNodeStore(SpindleDbContext context) : INodeStore
             , cancellationToken);
 
         await CompleteAttemptAsync(flowInstanceId, nodeId, attempt, NodeStatus.Failed, failedAt, error, cancellationToken);
+    }
+
+    public async ValueTask<bool> TryScheduleRetryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        NodeStatus attemptOutcome,
+        string error,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .Where(x => x.Status == NodeStatus.Running && x.Attempt == attempt)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.Status, _ => NodeStatus.Waiting)
+                .SetProperty(x => x.Error, _ => error)
+                .SetProperty(x => x.RetryAt, _ => retryAt)
+                .SetProperty(x => x.UpdatedAt, _ => updatedAt)
+            , cancellationToken);
+
+        if (updated == 0)
+        {
+            return false;
+        }
+
+        await CompleteAttemptAsync(flowInstanceId, nodeId, attempt, attemptOutcome, updatedAt, error, cancellationToken);
+        return true;
+    }
+
+    public async ValueTask<bool> TryMarkRetryReadyAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .Where(x => x.Status == NodeStatus.Waiting && x.RetryAt == retryAt)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.Status, _ => NodeStatus.Ready)
+                .SetProperty(x => x.RetryAt, _ => (DateTimeOffset?)null)
+                .SetProperty(x => x.UpdatedAt, _ => updatedAt)
+            , cancellationToken);
+
+        return updated > 0;
+    }
+
+    public async ValueTask<bool> TryInterruptAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        DateTimeOffset interruptedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .Where(x => x.Status == NodeStatus.Running && x.Attempt == attempt)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.Status, _ => NodeStatus.Ready)
+                .SetProperty(x => x.RetryAttemptBaseline, x => x.RetryAttemptBaseline + 1)
+                .SetProperty(x => x.UpdatedAt, _ => interruptedAt)
+            , cancellationToken);
+
+        if (updated == 0)
+        {
+            return false;
+        }
+
+        await CompleteAttemptAsync(flowInstanceId, nodeId, attempt, NodeStatus.Cancelled, interruptedAt, null, cancellationToken);
+        return true;
+    }
+
+    public async ValueTask<bool> TryScheduleRecoveryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        NodeStatus expectedStatus,
+        int expectedAttempt,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var updated = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .Where(x => x.Status == expectedStatus && x.Attempt == expectedAttempt)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(x => x.Status, _ => NodeStatus.Waiting)
+                .SetProperty(x => x.RetryAt, _ => retryAt)
+                .SetProperty(x => x.RetryAttemptBaseline, x => x.Attempt)
+                .SetProperty(x => x.CompletedAt, _ => (DateTimeOffset?)null)
+                .SetProperty(x => x.UpdatedAt, _ => updatedAt)
+            , cancellationToken);
+
+        return updated > 0;
+    }
+
+    public async ValueTask<bool> TryReopenBarrierAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        // The result is an owned type, which ExecuteUpdate cannot clear, so update the tracked entity.
+        var barrier = await context.NodeInstances
+            .Where(x => x.FlowInstanceId == flowInstanceId.Value && x.NodeId == nodeId.Value)
+            .Where(x => (x.Kind == NodeKind.WaitAll || x.Kind == NodeKind.WaitAny) && x.Status == NodeStatus.Failed)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (barrier is null)
+        {
+            return false;
+        }
+
+        barrier.Status = NodeStatus.Waiting;
+        barrier.Result = null;
+        barrier.Error = null;
+        barrier.CompletedAt = null;
+        barrier.UpdatedAt = updatedAt;
+
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async ValueTask MarkDependentsReadyAsync(

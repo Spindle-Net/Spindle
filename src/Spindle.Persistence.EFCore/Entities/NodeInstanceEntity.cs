@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
+using Spindle.Abstractions.Policies;
 using Spindle.Abstractions.Steps;
 using System.ComponentModel.DataAnnotations;
 
@@ -47,7 +48,13 @@ internal class NodeInstanceEntity
 
     public string? Error { get; set; }
 
+    public RetryPolicy? RetryPolicy { get; init; }
+
+    public TimeoutPolicy? TimeoutPolicy { get; init; }
+
     public int Attempt { get; set; }
+
+    public int RetryAttemptBaseline { get; set; }
 
     public DateTimeOffset? RetryAt { get; set; }
 

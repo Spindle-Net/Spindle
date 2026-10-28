@@ -6,6 +6,7 @@ using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Flows;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
+using Spindle.Abstractions.Policies;
 using Spindle.Abstractions.Steps;
 using Spindle.Hosting;
 using Spindle.Persistence;
@@ -112,6 +113,43 @@ public sealed class SqliteHostedWorkflowTests
         Assert.Null(instance?.Result);
     }
 
+    [Fact]
+    public async Task HostedWorker_RetriesFailedStepWhenRetryTimerFires()
+    {
+        var initial = DateTimeOffset.Parse("2026-07-29T10:00:00Z");
+        var clock = new FakeSpindleClock(initial);
+        await using var application = await SqliteWorkflowApplication.StartAsync(
+            services => services.AddSpindleFlow<FlakyFlow, FlakyRequest, FlakyResult>(
+                FlakyFlow.Name),
+            clock);
+
+        var handle = await application.Runtime.StartAsync<FlakyRequest, FlakyResult>(
+            FlakyFlow.Name,
+            new FlakyRequest(Failures: 1));
+
+        var waiting = await application.WaitForSnapshotAsync(
+            handle.InstanceId,
+            snapshot => snapshot.Nodes.Any(node => node.RetryAt is not null));
+        var step = Assert.Single(waiting.Nodes);
+
+        Assert.Equal(NodeStatus.Waiting, step.Status);
+        Assert.Equal(initial.AddMinutes(1), step.RetryAt);
+        Assert.Equal(1, step.Attempt);
+
+        // Let the worker go idle on this flow before the retry becomes due.
+        await application.Pump.RunUntilIdleAsync();
+        clock.AdvanceBy(TimeSpan.FromMinutes(1));
+
+        var completed = await application.WaitForTerminalStatusAsync(handle.InstanceId);
+        var instance = await application.Store.FlowInstances.GetAsync(handle.InstanceId);
+
+        Assert.Equal(FlowInstanceStatus.Completed, completed.Status);
+        Assert.Equal(2, Assert.Single(completed.Nodes).Attempt);
+        Assert.Equal(
+            new FlakyResult(2),
+            application.Serializer.Deserialize<FlakyResult>(instance!.Result!));
+    }
+
     private sealed record CalculationRequest(int Value);
 
     private sealed record CalculationResult(
@@ -189,6 +227,45 @@ public sealed class SqliteHostedWorkflowTests
                     new InvalidOperationException(request.Message)));
 
             return new FailingResult((await failed).ToString());
+        }
+    }
+
+    private sealed record FlakyRequest(int Failures);
+
+    private sealed record FlakyResult(int Executions);
+
+    private sealed class FlakyFlow
+        : ISpindleFlow<FlakyRequest, FlakyResult>
+    {
+        private static int s_executions;
+
+        public static FlowName Name { get; } = new("sqlite-flaky");
+
+        public async ValueTask<FlakyResult> RunAsync(
+            IFlowContext context,
+            FlakyRequest request)
+        {
+            var executions = await context
+                .Step<int>(
+                    "flaky",
+                    "Fail until retried",
+                    () =>
+                    {
+                        var execution = Interlocked.Increment(ref s_executions);
+                        return execution <= request.Failures
+                            ? throw new InvalidOperationException("planned failure")
+                            : ValueTask.FromResult(execution);
+                    })
+                .WithRetry(new RetryPolicy
+                {
+                    MaxAttempts = 2,
+                    BackoffKind = RetryBackoffKind.Fixed,
+                    InitialDelay = TimeSpan.FromMinutes(1),
+                    MaxDelay = TimeSpan.FromMinutes(1),
+                    JitterFactor = 0
+                });
+
+            return new FlakyResult(executions);
         }
     }
 
@@ -298,7 +375,7 @@ public sealed class SqliteHostedWorkflowTests
             await _databaseAnchor.DisposeAsync();
         }
 
-        private async Task<FlowInstanceSnapshot> WaitForSnapshotAsync(
+        public async Task<FlowInstanceSnapshot> WaitForSnapshotAsync(
             FlowInstanceId instanceId,
             Func<FlowInstanceSnapshot, bool> predicate)
         {

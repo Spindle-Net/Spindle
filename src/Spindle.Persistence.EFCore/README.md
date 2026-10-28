@@ -48,6 +48,11 @@ await using var database = await contextFactory.CreateDbContextAsync();
 await database.Database.MigrateAsync();
 ```
 
+Apply new migrations before deploying a runtime version that needs them. For
+example, `AddStepRetryPolicies` adds the columns that store step retry and
+timeout policies; existing nodes get no policies and start with a retry
+baseline of zero.
+
 ## Managing migrations
 
 The repository includes equivalent Bash and PowerShell helpers that run `dotnet ef` against the provider-specific projects:

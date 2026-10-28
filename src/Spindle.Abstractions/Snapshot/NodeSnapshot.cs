@@ -20,6 +20,11 @@ public sealed record NodeSnapshot
 
     public int Attempt { get; init; }
 
+    /// <summary>
+    /// When the step's pending retry becomes ready, if it is waiting for one.
+    /// </summary>
+    public DateTimeOffset? RetryAt { get; init; }
+
     public DateTimeOffset? StartedAt { get; init; }
 
     public DateTimeOffset? CompletedAt { get; init; }

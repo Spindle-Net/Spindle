@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Spindle.Abstractions.Policies;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence.EFCore.Configuration;
 using Spindle.Persistence.EFCore.Entities;
@@ -156,6 +157,13 @@ public sealed class SpindleDbContext(
         modelBuilder.Entity<NodeInstanceEntity>(entity =>
         {
             entity.ToTable("NodeInstances");
+
+            entity
+                .Property(node => node.RetryPolicy)
+                .HasConversion<PolicyJsonConverter<RetryPolicy>>();
+            entity
+                .Property(node => node.TimeoutPolicy)
+                .HasConversion<PolicyJsonConverter<TimeoutPolicy>>();
 
             entity.OwnsOne(
                 owner => owner.Input,

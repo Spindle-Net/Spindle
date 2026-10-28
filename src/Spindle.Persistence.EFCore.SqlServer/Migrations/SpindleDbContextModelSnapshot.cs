@@ -286,11 +286,20 @@ namespace Spindle.Persistence.EFCore.SqlServer.Migrations
                     b.Property<DateTimeOffset?>("RetryAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int>("RetryAttemptBaseline")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RetryPolicy")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<string>("TimeoutPolicy")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");

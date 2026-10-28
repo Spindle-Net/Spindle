@@ -166,6 +166,29 @@ internal sealed class FlowExecutionSession(FlowInstanceId flowInstanceId)
     public IReadOnlyList<NodeInitialization> GetPendingNodeInitializations()
         => _pendingInitializations.Values.ToArray();
 
+    /// <summary>
+    /// Applies changed step options to a step declared during this replay. Steps that already exist in the
+    /// store keep the options they were first persisted with.
+    /// </summary>
+    public bool TryConfigureStepOptions(
+        NodeId nodeId,
+        StepOptions options)
+    {
+        if (!_pendingNodeDeclarations.Contains(nodeId))
+        {
+            return false;
+        }
+
+        _nodes[nodeId] = _nodes[nodeId] with
+        {
+            Queue = options.Queue,
+            DispatchMode = options.DispatchMode,
+            RetryPolicy = options.Retry,
+            TimeoutPolicy = options.Timeout
+        };
+        return true;
+    }
+
     public bool TryConfigureConditionTimeout(
         NodeId nodeId,
         TimeSpan timeout)
