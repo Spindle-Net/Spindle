@@ -190,4 +190,25 @@ internal sealed class EFCoreFlowInstanceStore(SpindleDbContext context) : IFlowI
                 , cancellationToken: cancellationToken);
     }
 
+    public async ValueTask<bool> TryReopenAsync(
+        FlowInstanceId instanceId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var activity = SpindleEFCoreTelemetry.ActivitySource.StartActivity();
+
+        var updated = await context.FlowInstances
+            .Where(x => x.InstanceId == instanceId.Value)
+            .Where(x => x.Status == FlowInstanceStatus.Failed || x.Status == FlowInstanceStatus.TimedOut)
+            .ExecuteUpdateAsync(x =>
+                x
+                    .SetProperty(y => y.Status, _ => FlowInstanceStatus.Running)
+                    .SetProperty(y => y.Error, _ => (string?)null)
+                    .SetProperty(y => y.CompletedAt, _ => (DateTimeOffset?)null)
+                    .SetProperty(y => y.UpdatedAt, _ => updatedAt)
+                , cancellationToken: cancellationToken);
+
+        return updated > 0;
+    }
 }

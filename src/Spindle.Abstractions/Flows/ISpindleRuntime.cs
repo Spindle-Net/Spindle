@@ -112,6 +112,17 @@ public interface ISpindleRuntime
         string? reason = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Schedules failed or timed-out steps to run again. Each scheduled step gets a fresh retry budget,
+    /// while completed work and the step's attempt history are kept. The steps run on the next
+    /// <c>RunAsync</c> or worker pass; this method does not execute them itself.
+    /// </summary>
+    /// <param name="instanceId">An active, failed or timed-out flow instance.</param>
+    /// <param name="nodeId">The step to retry, or <c>null</c> to retry every failed or timed-out step.</param>
+    /// <param name="cancellationToken">A cancellation token for scheduling the retry.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The flow does not exist, is completed or cancelled, or has no matching failed or timed-out step.
+    /// </exception>
     ValueTask RetryAsync(
         FlowInstanceId instanceId,
         NodeId? nodeId = null,

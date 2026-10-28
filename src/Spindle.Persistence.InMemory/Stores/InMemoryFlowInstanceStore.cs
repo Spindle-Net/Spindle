@@ -164,6 +164,33 @@ public sealed class InMemoryFlowInstanceStore : IFlowInstanceStore
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask<bool> TryReopenAsync(
+        FlowInstanceId instanceId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            var instance = GetRequired(instanceId);
+            if (instance.Status is not (FlowInstanceStatus.Failed or FlowInstanceStatus.TimedOut))
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            _instances[instanceId] = instance with
+            {
+                Status = FlowInstanceStatus.Running,
+                Error = null,
+                CompletedAt = null,
+                UpdatedAt = updatedAt
+            };
+        }
+
+        return ValueTask.FromResult(true);
+    }
+
     private FlowInstanceRecord GetRequired(FlowInstanceId instanceId)
     {
         return _instances.TryGetValue(instanceId, out var instance)

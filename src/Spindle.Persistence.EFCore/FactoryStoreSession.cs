@@ -74,6 +74,9 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
         public ValueTask MarkFailedAsync(FlowInstanceId instanceId, string error, DateTimeOffset failedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.FlowInstances.MarkFailedAsync(instanceId, error, failedAt, token), cancellationToken);
+
+        public ValueTask<bool> TryReopenAsync(FlowInstanceId instanceId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.FlowInstances.TryReopenAsync(instanceId, updatedAt, token), cancellationToken);
     }
 
     private sealed class NodeStore(EFCoreSpindleStore store) : INodeStore
@@ -113,6 +116,24 @@ internal sealed class FactoryStoreSession : ISpindleStoreSession
 
         public ValueTask MarkFailedAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, string error, DateTimeOffset failedAt, DateTimeOffset? retryAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Nodes.MarkFailedAsync(flowInstanceId, nodeId, attempt, error, failedAt, retryAt, token), cancellationToken);
+
+        public ValueTask<IReadOnlyList<StepAttemptRecord>> GetAttemptsAsync(FlowInstanceId flowInstanceId, NodeId nodeId, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.GetAttemptsAsync(flowInstanceId, nodeId, token), cancellationToken);
+
+        public ValueTask<bool> TryScheduleRetryAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, NodeStatus attemptOutcome, string error, DateTimeOffset retryAt, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryScheduleRetryAsync(flowInstanceId, nodeId, attempt, attemptOutcome, error, retryAt, updatedAt, token), cancellationToken);
+
+        public ValueTask<bool> TryMarkRetryReadyAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset retryAt, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryMarkRetryReadyAsync(flowInstanceId, nodeId, retryAt, updatedAt, token), cancellationToken);
+
+        public ValueTask<bool> TryInterruptAsync(FlowInstanceId flowInstanceId, NodeId nodeId, int attempt, DateTimeOffset interruptedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryInterruptAsync(flowInstanceId, nodeId, attempt, interruptedAt, token), cancellationToken);
+
+        public ValueTask<bool> TryScheduleRecoveryAsync(FlowInstanceId flowInstanceId, NodeId nodeId, NodeStatus expectedStatus, int expectedAttempt, DateTimeOffset retryAt, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryScheduleRecoveryAsync(flowInstanceId, nodeId, expectedStatus, expectedAttempt, retryAt, updatedAt, token), cancellationToken);
+
+        public ValueTask<bool> TryReopenBarrierAsync(FlowInstanceId flowInstanceId, NodeId nodeId, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
+            store.ExecuteAsync((session, token) => session.Nodes.TryReopenBarrierAsync(flowInstanceId, nodeId, updatedAt, token), cancellationToken);
 
         public ValueTask MarkDependentsReadyAsync(FlowInstanceId flowInstanceId, List<NodeId>? updatedNodes, DateTimeOffset updatedAt, CancellationToken cancellationToken = default) =>
             store.ExecuteDirectAsync((session, token) => session.Nodes.MarkDependentsReadyAsync(flowInstanceId, updatedNodes, updatedAt, token), cancellationToken);

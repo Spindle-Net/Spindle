@@ -9,6 +9,7 @@ using Spindle.Abstractions.Snapshot;
 using Spindle.Persistence;
 using Spindle.Persistence.FlowDefinitions;
 using Spindle.Persistence.Nodes;
+using Spindle.Persistence.Timers;
 using Spindle.Runtime;
 
 namespace Spindle;
@@ -243,60 +244,113 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             .ConfigureAwait(false);
 
         var session = new FlowExecutionSession(handle.InstanceId);
+        var iterations = 0;
 
-        return await ExecuteWithInstanceGateAsync(
-                handle.InstanceId,
-                async gateCancellationToken =>
+        while (true)
+        {
+            // Each iteration takes the instance gate separately, so recovery and hosted advancement can
+            // interleave while this call waits for a pending retry.
+            var iteration = await ExecuteWithInstanceGateAsync(
+                    handle.InstanceId,
+                    gateCancellationToken => RunIterationAsync<TResult>(
+                        handle.InstanceId,
+                        session,
+                        gateCancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (iteration.Completed)
+            {
+                return iteration.Result!;
+            }
+
+            if (iteration.MadeProgress)
+            {
+                if (++iterations >= _options.MaxRunIterations)
                 {
-                    for (var iteration = 0; iteration < _options.MaxRunIterations; iteration++)
-                    {
-                        var firedTimers = await FireDueTimersAsync(handle.InstanceId, gateCancellationToken)
-                            .ConfigureAwait(false);
-
-                        await _flowExecutor
-                            .ExecuteAsync(handle.InstanceId, session, gateCancellationToken)
-                            .ConfigureAwait(false);
-
-                        var instance = await _store.FlowInstances
-                            .GetAsync(handle.InstanceId, gateCancellationToken)
-                            .ConfigureAwait(false)
-                            ?? throw new InvalidOperationException($"Flow instance '{handle.InstanceId}' disappeared.");
-
-                        if (instance.Status == FlowInstanceStatus.Completed)
-                        {
-                            if (instance.Result is null)
-                            {
-                                return default!;
-                            }
-
-                            return _serializer.Deserialize<TResult>(instance.Result);
-                        }
-
-                        if (instance.Status == FlowInstanceStatus.Failed)
-                        {
-                            throw new InvalidOperationException(
-                                $"Flow '{instance.FlowName}' instance '{instance.InstanceId}' failed: {instance.Error}");
-                        }
-
-                        var executed = await _stepExecutor
-                            .ExecuteReadyStepsAsync(session, cancellationToken: gateCancellationToken)
-                            .ConfigureAwait(false);
-
-                        firedTimers += await FireDueTimersAsync(handle.InstanceId, gateCancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (executed == 0 && firedTimers == 0)
-                        {
-                            throw new NotSupportedException(
-                                $"Flow '{instance.FlowName}' instance '{instance.InstanceId}' is waiting, but no local ready steps can be executed by this runtime.");
-                        }
-                    }
-
                     throw new InvalidOperationException(
                         $"Flow '{flowName}' did not complete within {_options.MaxRunIterations} local runtime iterations.");
-                },
-                cancellationToken)
+                }
+
+                continue;
+            }
+
+            if (iteration.NextRetryAt is not { } retryAt)
+            {
+                throw new NotSupportedException(
+                    $"Flow '{flowName}' instance '{handle.InstanceId}' is waiting, but no local ready steps can be executed by this runtime.");
+            }
+
+            // Waiting for a retry is not an iteration: no work could be done until the retry is due.
+            await _timeProvider.DelayUntilAsync(retryAt, cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask<RunIteration<TResult>> RunIterationAsync<TResult>(
+        FlowInstanceId instanceId,
+        FlowExecutionSession session,
+        CancellationToken cancellationToken)
+    {
+        var firedTimers = await FireDueTimersAsync(instanceId, cancellationToken)
             .ConfigureAwait(false);
+
+        await _flowExecutor
+            .ExecuteAsync(instanceId, session, cancellationToken)
+            .ConfigureAwait(false);
+
+        var instance = await _store.FlowInstances
+            .GetAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"Flow instance '{instanceId}' disappeared.");
+
+        switch (instance.Status)
+        {
+            case FlowInstanceStatus.Completed:
+                return RunIteration<TResult>.Complete(
+                    instance.Result is null
+                        ? default!
+                        : _serializer.Deserialize<TResult>(instance.Result));
+            case FlowInstanceStatus.Failed:
+                throw new InvalidOperationException(
+                    $"Flow '{instance.FlowName}' instance '{instance.InstanceId}' failed: {instance.Error}");
+            case FlowInstanceStatus.Cancelled:
+                throw new OperationCanceledException(
+                    $"Flow '{instance.FlowName}' instance '{instance.InstanceId}' was cancelled.");
+        }
+
+        var executed = await _stepExecutor
+            .ExecuteReadyStepsAsync(session, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        firedTimers += await FireDueTimersAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (executed > 0 || firedTimers > 0)
+        {
+            return RunIteration<TResult>.Progress;
+        }
+
+        var nodes = await _store.Nodes
+            .GetByFlowInstanceAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return RunIteration<TResult>.Idle(nodes
+            .Where(node => node.Status == NodeStatus.Waiting)
+            .Min(node => node.RetryAt));
+    }
+
+    private readonly record struct RunIteration<TResult>(
+        bool Completed,
+        TResult? Result,
+        bool MadeProgress,
+        DateTimeOffset? NextRetryAt)
+    {
+        public static RunIteration<TResult> Progress { get; } = new(false, default, MadeProgress: true, null);
+
+        public static RunIteration<TResult> Complete(TResult result) => new(true, result, MadeProgress: true, null);
+
+        public static RunIteration<TResult> Idle(DateTimeOffset? nextRetryAt) => new(false, default, MadeProgress: false, nextRetryAt);
     }
 
     public async ValueTask<int> FireDueTimersAsync(
@@ -323,17 +377,40 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                             continue;
                         }
 
+                        var flow = await storeSession.FlowInstances
+                            .GetAsync(timer.FlowInstanceId, storeCancellationToken)
+                            .ConfigureAwait(false);
+
                         var step = await storeSession.Nodes
                             .GetAsync(timer.FlowInstanceId, timer.NodeId, storeCancellationToken)
                             .ConfigureAwait(false);
 
-                        if (step is null ||
+                        if (flow is null ||
+                            IsTerminal(flow.Status) ||
+                            step is null ||
                             step.Status is NodeStatus.Completed
                                 or NodeStatus.Failed
                                 or NodeStatus.Cancelled
                                 or NodeStatus.TimedOut
                                 or NodeStatus.Skipped)
                         {
+                            await storeSession.Timers
+                                .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
+                                .ConfigureAwait(false);
+                            continue;
+                        }
+
+                        if (step.Kind == NodeKind.Step)
+                        {
+                            // A step timer is always a retry. It only makes the step ready again; a timer whose due
+                            // time no longer matches the step's pending retry is stale and is discarded.
+                            if (await storeSession.Nodes
+                                    .TryMarkRetryReadyAsync(timer.FlowInstanceId, timer.NodeId, timer.DueAt, now, storeCancellationToken)
+                                    .ConfigureAwait(false))
+                            {
+                                fired++;
+                            }
+
                             await storeSession.Timers
                                 .MarkFiredAsync(timer.FlowInstanceId, timer.NodeId, now, storeCancellationToken)
                                 .ConfigureAwait(false);
@@ -628,12 +705,148 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             .ConfigureAwait(false);
     }
 
-    public ValueTask RetryAsync(
+    public async ValueTask RetryAsync(
         FlowInstanceId instanceId,
         NodeId? nodeId = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotSupportedException("Retry is not supported by the local MVP runtime yet.");
+        await ExecuteWithInstanceGateAsync(
+                instanceId,
+                gateCancellationToken => _store.ExecuteAsync(
+                    (storeSession, storeCancellationToken) => ScheduleRecoveryAsync(
+                        storeSession,
+                        instanceId,
+                        nodeId,
+                        storeCancellationToken),
+                    gateCancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask ScheduleRecoveryAsync(
+        ISpindleStoreSession storeSession,
+        FlowInstanceId instanceId,
+        NodeId? nodeId,
+        CancellationToken cancellationToken)
+    {
+        var instance = await storeSession.FlowInstances
+            .GetAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"Flow instance '{instanceId}' does not exist.");
+
+        if (instance.Status is FlowInstanceStatus.Completed or FlowInstanceStatus.Cancelled)
+        {
+            throw new InvalidOperationException(
+                $"Flow instance '{instanceId}' is {instance.Status.ToString().ToLowerInvariant()} and cannot be retried.");
+        }
+
+        var nodes = await storeSession.Nodes
+            .GetByFlowInstanceAsync(instanceId, cancellationToken)
+            .ConfigureAwait(false);
+        var targets = SelectRecoveryTargets(instanceId, nodes, nodeId);
+        var now = _timeProvider.GetUtcNow();
+
+        // Each transition is conditional on the state read above, so a concurrent recovery or a worker that
+        // already moved the step on makes the transition a no-op instead of scheduling it twice.
+        var recovered = new HashSet<NodeId>();
+        foreach (var target in targets)
+        {
+            if (!await storeSession.Nodes
+                    .TryScheduleRecoveryAsync(instanceId, target.NodeId, target.Status, target.Attempt, now, now, cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            await storeSession.Timers
+                .CreateAsync(
+                    new TimerRecord
+                    {
+                        FlowInstanceId = instanceId,
+                        NodeId = target.NodeId,
+                        DueAt = now,
+                        CreatedAt = now
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+            recovered.Add(target.NodeId);
+        }
+
+        if (recovered.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Flow instance '{instanceId}' has no failed or timed-out steps left to retry.");
+        }
+
+        await ReopenFailedBarriersAsync(storeSession, instanceId, nodes, recovered, now, cancellationToken)
+            .ConfigureAwait(false);
+
+        await storeSession.FlowInstances
+            .TryReopenAsync(instanceId, now, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static IReadOnlyList<NodeInstanceRecord> SelectRecoveryTargets(
+        FlowInstanceId instanceId,
+        IReadOnlyList<NodeInstanceRecord> nodes,
+        NodeId? nodeId)
+    {
+        if (nodeId is not { } targetId)
+        {
+            var targets = nodes.Where(IsRecoverable).ToArray();
+            return targets.Length > 0
+                ? targets
+                : throw new InvalidOperationException(
+                    $"Flow instance '{instanceId}' has no failed or timed-out steps to retry.");
+        }
+
+        var target = nodes.FirstOrDefault(node => node.NodeId == targetId)
+            ?? throw new InvalidOperationException(
+                $"Node '{targetId}' does not exist for flow instance '{instanceId}'.");
+
+        return IsRecoverable(target)
+            ? [target]
+            : throw new InvalidOperationException(
+                $"Node '{targetId}' is a {target.Kind} node with status {target.Status}; only failed or timed-out steps can be retried.");
+    }
+
+    private static bool IsRecoverable(NodeInstanceRecord node)
+        => node.Kind == NodeKind.Step && node.Status is NodeStatus.Failed or NodeStatus.TimedOut;
+
+    /// <summary>
+    /// Reopens failed wait barriers that depend, directly or through other failed barriers, on a recovered
+    /// step, so replay evaluates them again. Completed barriers keep their result.
+    /// </summary>
+    private static async ValueTask ReopenFailedBarriersAsync(
+        ISpindleStoreSession storeSession,
+        FlowInstanceId instanceId,
+        IReadOnlyList<NodeInstanceRecord> nodes,
+        HashSet<NodeId> recovered,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var reopened = new HashSet<NodeId>(recovered);
+        var failedBarriers = nodes
+            .Where(node => node.Kind is NodeKind.WaitAll or NodeKind.WaitAny && node.Status == NodeStatus.Failed)
+            .ToList();
+
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var barrier in failedBarriers.Where(barrier => barrier.Dependencies.Any(reopened.Contains)).ToArray())
+            {
+                failedBarriers.Remove(barrier);
+                if (await storeSession.Nodes
+                        .TryReopenBarrierAsync(instanceId, barrier.NodeId, now, cancellationToken)
+                        .ConfigureAwait(false))
+                {
+                    reopened.Add(barrier.NodeId);
+                    changed = true;
+                }
+            }
+        }
+        while (changed);
     }
 
     public async ValueTask<FlowInstanceSnapshot?> GetInstanceAsync(
@@ -670,6 +883,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
                 HandlerId = node.HandlerId,
                 Queue = node.Queue,
                 Attempt = node.Attempt,
+                RetryAt = node.RetryAt,
                 StartedAt = node.StartedAt,
                 CompletedAt = node.CompletedAt,
                 LastError = node.Error
@@ -699,6 +913,7 @@ public sealed class RuntimeSpindleRuntime : ISpindleRuntime
             if (before[i].NodeId != after[i].NodeId ||
                 before[i].Status != after[i].Status ||
                 before[i].Attempt != after[i].Attempt ||
+                before[i].RetryAt != after[i].RetryAt ||
                 before[i].CompletedAt != after[i].CompletedAt ||
                 before[i].Error != after[i].Error ||
                 !PayloadEquals(before[i].Result, after[i].Result))

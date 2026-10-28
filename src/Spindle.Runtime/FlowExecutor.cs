@@ -117,6 +117,11 @@ internal sealed class FlowExecutor(
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Host or caller cancellation interrupts replay; it is not a flow failure.
+            throw;
+        }
         catch (Exception exception)
         {
             await store

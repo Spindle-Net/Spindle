@@ -39,4 +39,14 @@ public interface IFlowInstanceStore
         string error,
         DateTimeOffset failedAt,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a failed or timed-out flow to <see cref="FlowInstanceStatus.Running"/> and clears its error and
+    /// completion time.
+    /// </summary>
+    /// <returns><c>true</c> if the flow was failed or timed out and was updated.</returns>
+    ValueTask<bool> TryReopenAsync(
+        FlowInstanceId instanceId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default);
 }

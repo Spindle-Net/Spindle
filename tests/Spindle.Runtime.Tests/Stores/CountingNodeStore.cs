@@ -179,4 +179,53 @@ internal sealed class CountingNodeStore(
         return inner.MarkDependentsReadyAsync(flowInstanceId, updatedNodes, updatedAt, cancellationToken);
     }
 
+    public ValueTask<IReadOnlyList<StepAttemptRecord>> GetAttemptsAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        CancellationToken cancellationToken = default)
+        => inner.GetAttemptsAsync(flowInstanceId, nodeId, cancellationToken);
+
+    public ValueTask<bool> TryScheduleRetryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        NodeStatus attemptOutcome,
+        string error,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+        => inner.TryScheduleRetryAsync(flowInstanceId, nodeId, attempt, attemptOutcome, error, retryAt, updatedAt, cancellationToken);
+
+    public ValueTask<bool> TryMarkRetryReadyAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+        => inner.TryMarkRetryReadyAsync(flowInstanceId, nodeId, retryAt, updatedAt, cancellationToken);
+
+    public ValueTask<bool> TryInterruptAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        int attempt,
+        DateTimeOffset interruptedAt,
+        CancellationToken cancellationToken = default)
+        => inner.TryInterruptAsync(flowInstanceId, nodeId, attempt, interruptedAt, cancellationToken);
+
+    public ValueTask<bool> TryScheduleRecoveryAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        NodeStatus expectedStatus,
+        int expectedAttempt,
+        DateTimeOffset retryAt,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+        => inner.TryScheduleRecoveryAsync(flowInstanceId, nodeId, expectedStatus, expectedAttempt, retryAt, updatedAt, cancellationToken);
+
+    public ValueTask<bool> TryReopenBarrierAsync(
+        FlowInstanceId flowInstanceId,
+        NodeId nodeId,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken = default)
+        => inner.TryReopenBarrierAsync(flowInstanceId, nodeId, updatedAt, cancellationToken);
 }

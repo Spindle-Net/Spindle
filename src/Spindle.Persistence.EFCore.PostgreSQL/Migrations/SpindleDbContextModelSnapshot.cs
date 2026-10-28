@@ -285,11 +285,20 @@ namespace Spindle.Persistence.EFCore.PostgreSQL.Migrations
                     b.Property<DateTimeOffset?>("RetryAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("RetryAttemptBaseline")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RetryPolicy")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("TimeoutPolicy")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

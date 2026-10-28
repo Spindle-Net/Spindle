@@ -93,7 +93,7 @@ internal sealed class StepExecutor(
 
                 executed++;
 
-                steps[step.NodeId] = step with { Status = result.Status };
+                steps[step.NodeId] = result.Node ?? step with { Status = result.Status };
                 session.UpsertNode(steps[step.NodeId]);
 
                 if (result.Status != NodeStatus.Completed)
@@ -131,6 +131,10 @@ internal sealed class StepExecutor(
             return (step, await executor
                 .ExecuteAsync(session, step, cancellationToken)
                 .ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

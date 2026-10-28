@@ -3,17 +3,17 @@ namespace Spindle.Abstractions.Policies;
 public enum TimeoutBehavior
 {
     /// <summary>
-    /// Fail the current step if it times out
+    /// Fail the attempt. The step is retried when its retry policy allows it, otherwise it ends as timed out.
     /// </summary>
     Fail,
 
     /// <summary>
-    /// Cancel the flow if the step times out
+    /// Mark the step as timed out and cancel the flow, without retrying.
     /// </summary>
     Cancel,
 
     /// <summary>
-    /// Continue with the rest of the flow if the timeout is hit
+    /// Complete the step with the default value of its result type and continue the flow, without retrying.
     /// </summary>
     Continue
 }

@@ -24,6 +24,68 @@ public sealed class TestingInfrastructureTests
     }
 
     [Fact]
+    public async Task FakeClock_CompletesDelayOnlyWhenAdvancedPastDueTime()
+    {
+        var clock = new FakeSpindleClock(DateTimeOffset.Parse("2026-06-28T12:00:00Z"));
+
+        var delay = Task.Delay(TimeSpan.FromSeconds(10), clock);
+
+        Assert.Equal(1, clock.ActiveTimerCount);
+        clock.Advance(TimeSpan.FromSeconds(9));
+        Assert.False(delay.IsCompleted);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await delay.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(0, clock.ActiveTimerCount);
+    }
+
+    [Fact]
+    public void FakeClock_CancelsTokenSourceAfterTimeout()
+    {
+        var clock = new FakeSpindleClock(DateTimeOffset.Parse("2026-06-28T12:00:00Z"));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1), clock);
+
+        clock.Advance(TimeSpan.FromSeconds(59));
+        Assert.False(cancellation.IsCancellationRequested);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.True(cancellation.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void FakeClock_FiresPeriodicTimersOncePerPeriodAndStopsAfterDispose()
+    {
+        var clock = new FakeSpindleClock(DateTimeOffset.Parse("2026-06-28T12:00:00Z"));
+        var fired = 0;
+        var timer = clock.CreateTimer(_ => fired++, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+        clock.Advance(TimeSpan.FromSeconds(3));
+        Assert.Equal(3, fired);
+
+        timer.Dispose();
+        clock.Advance(TimeSpan.FromSeconds(3));
+        Assert.Equal(3, fired);
+        Assert.Equal(0, clock.ActiveTimerCount);
+    }
+
+    [Fact]
+    public void FakeClock_ChangeReschedulesAndInfiniteDueTimeDisablesTimer()
+    {
+        var clock = new FakeSpindleClock(DateTimeOffset.Parse("2026-06-28T12:00:00Z"));
+        var fired = 0;
+        using var timer = clock.CreateTimer(_ => fired++, null, TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan);
+
+        Assert.True(timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan));
+        clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.Equal(0, fired);
+
+        timer.Change(TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
     public async Task InMemoryFlowStore_CopiesPayloadBytes()
     {
         var store = new InMemorySpindleStore();

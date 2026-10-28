@@ -1,6 +1,7 @@
 using Spindle.Abstractions.Core;
 using Spindle.Abstractions.Snapshot;
 using Spindle.Abstractions.Nodes;
+using Spindle.Abstractions.Policies;
 using Spindle.Abstractions.Steps;
 
 namespace Spindle.Persistence.Nodes;
@@ -34,8 +35,24 @@ public sealed record NodeInstanceRecord
 
     public string? Error { get; init; }
 
+    public RetryPolicy? RetryPolicy { get; init; }
+
+    public TimeoutPolicy? TimeoutPolicy { get; init; }
+
+    /// <summary>
+    /// The lifetime number of attempts this node has started.
+    /// </summary>
     public int Attempt { get; init; }
 
+    /// <summary>
+    /// The value of <see cref="Attempt"/> when the current retry budget started. Attempts beyond this
+    /// baseline count towards <see cref="Spindle.Abstractions.Policies.RetryPolicy.MaxAttempts"/>.
+    /// </summary>
+    public int RetryAttemptBaseline { get; init; }
+
+    /// <summary>
+    /// When a pending retry becomes ready. Only set while the node waits for a retry.
+    /// </summary>
     public DateTimeOffset? RetryAt { get; init; }
 
     public DateTimeOffset? StartedAt { get; init; }
